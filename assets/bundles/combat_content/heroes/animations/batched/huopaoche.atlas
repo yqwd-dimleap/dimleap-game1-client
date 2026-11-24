@@ -1,0 +1,11 @@
+troops.png
+size:2048,1024
+filter:Linear,Linear
+pma:true
+scale:0.5
+pao
+bounds:1174,262,26,32
+pao22
+bounds:1290,311,116,54
+paoa
+bounds:1174,296,114,69

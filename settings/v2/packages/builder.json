@@ -1,0 +1,204 @@
+{
+  "__version__": "1.3.9",
+  "bundleConfig": {
+    "custom": {
+      "local-gameplay": {
+        "displayName": "Local gameplay subpackages",
+        "configs": {
+          "native": {
+            "preferredOptions": {
+              "isRemote": false,
+              "compressionType": "merge_dep"
+            }
+          },
+          "web": {
+            "preferredOptions": {
+              "isRemote": false,
+              "compressionType": "merge_dep"
+            }
+          },
+          "miniGame": {
+            "configMode": "auto",
+            "preferredOptions": {
+              "isRemote": false,
+              "compressionType": "subpackage"
+            },
+            "fallbackOptions": {
+              "isRemote": false,
+              "compressionType": "merge_dep"
+            }
+          }
+        }
+      },
+      "remote-content": {
+        "displayName": "Remote resource content",
+        "configs": {
+          "native": {
+            "preferredOptions": {
+              "isRemote": false,
+              "compressionType": "merge_dep"
+            }
+          },
+          "web": {
+            "preferredOptions": {
+              "isRemote": true,
+              "compressionType": "merge_dep"
+            }
+          },
+          "miniGame": {
+            "configMode": "auto",
+            "preferredOptions": {
+              "isRemote": true,
+              "compressionType": "merge_dep"
+            },
+            "fallbackOptions": {
+              "isRemote": true,
+              "compressionType": "merge_dep"
+            }
+          }
+        }
+      }
+    }
+  },
+  "splash-setting": {
+    "totalTime": 0
+  },
+  "hasSetSplash": true,
+  "textureCompressConfig": {
+    "userPreset": {},
+    "defaultConfig": {
+      "default": {
+        "name": "Default Opaque",
+        "options": {
+          "miniGame": {
+            "etc1_rgb": {
+              "quality": "fast"
+            },
+            "pvrtc_4bits_rgb": {
+              "quality": "fast"
+            },
+            "jpg": {
+              "quality": 80
+            }
+          },
+          "android": {
+            "astc_8x8": {
+              "quality": "medium"
+            },
+            "etc1_rgb": {
+              "quality": "fast"
+            },
+            "jpg": {
+              "quality": 80
+            }
+          },
+          "harmonyos-next": {
+            "astc_8x8": {
+              "quality": "medium"
+            },
+            "etc1_rgb": {
+              "quality": "fast"
+            },
+            "jpg": {
+              "quality": 80
+            }
+          },
+          "ios": {
+            "astc_8x8": {
+              "quality": "medium"
+            },
+            "pvrtc_4bits_rgb": {
+              "quality": "fast"
+            },
+            "jpg": {
+              "quality": 80
+            }
+          },
+          "web": {
+            "astc_8x8": {
+              "quality": "medium"
+            },
+            "etc1_rgb": {
+              "quality": "fast"
+            },
+            "pvrtc_4bits_rgb": {
+              "quality": "fast"
+            },
+            "png": {
+              "quality": 80
+            }
+          },
+          "pc": {}
+        }
+      },
+      "transparent": {
+        "name": "Default Transparent",
+        "options": {
+          "miniGame": {
+            "etc1_rgb_a": {
+              "quality": "fast"
+            },
+            "pvrtc_4bits_rgb_a": {
+              "quality": "fast"
+            },
+            "png": {
+              "quality": 80
+            }
+          },
+          "android": {
+            "astc_8x8": {
+              "quality": "medium"
+            },
+            "etc1_rgb_a": {
+              "quality": "fast"
+            },
+            "png": {
+              "quality": 80
+            }
+          },
+          "harmonyos-next": {
+            "astc_8x8": {
+              "quality": "medium"
+            },
+            "etc1_rgb_a": {
+              "quality": "fast"
+            },
+            "png": {
+              "quality": 80
+            }
+          },
+          "ios": {
+            "astc_8x8": {
+              "quality": "medium"
+            },
+            "pvrtc_4bits_rgb_a": {
+              "quality": "fast"
+            },
+            "png": {
+              "quality": 80
+            }
+          },
+          "web": {
+            "astc_8x8": {
+              "quality": "medium"
+            },
+            "etc1_rgb_a": {
+              "quality": "fast"
+            },
+            "pvrtc_4bits_rgb_a": {
+              "quality": "fast"
+            },
+            "png": {
+              "quality": 80
+            }
+          },
+          "pc": {}
+        }
+      }
+    },
+    "userPresetMode": "config",
+    "customConfigsMode": "config",
+    "customConfigs": {},
+    "genMipmaps": true
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "ver": "1.2.0",
+  "importer": "directory",
+  "imported": true,
+  "uuid": "2ac7b448-aa27-4dfd-b289-fae2f3637a89",
+  "files": [],
+  "subMetas": {},
+  "userData": {
+    "isBundle": true,
+    "bundleName": "season_content",
+    "priority": 4,
+    "bundleConfigID": "remote-content"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "__version__": "1.0.0",
+  "PathExcel": "/Users/zhangzhihao/Documents/MyProject1/excel",
+  "PathJson": "/Users/zhangzhihao/Documents/MyProject1/assets/resources/config/game",
+  "PathTs": "/Users/zhangzhihao/Documents/MyProject1/tools/generated/tables"
+}

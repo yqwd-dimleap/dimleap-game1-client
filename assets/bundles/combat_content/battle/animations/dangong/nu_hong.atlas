@@ -1,0 +1,14 @@
+nu_hong.png
+size:512,256
+filter:Linear,Linear
+pma:true
+scale:0.5
+nuy1
+bounds:2,136,201,67
+nuy2
+bounds:205,138,65,191
+rotate:90
+nuy23
+bounds:2,2,131,132
+seng
+bounds:205,125,179,11

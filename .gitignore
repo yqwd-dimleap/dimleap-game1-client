@@ -1,0 +1,40 @@
+
+#///////////////////////////
+# Cocos Creator 3D Project
+#///////////////////////////
+library/
+temp/
+local/
+build/
+profiles/
+native
+#//////////////////////////
+# NPM
+#//////////////////////////
+node_modules/
+
+#//////////////////////////
+# VSCode
+#//////////////////////////
+.vscode/
+
+#//////////////////////////
+# WebStorm
+#//////////////////////////
+.idea/
+
+.agents/
+.creator/
+.dsh/
+.qoder-input-images/
+backups/
+backup/
+outputs/
+tests/
+tools/
+
+excel/
+extensions/
+funplay-cocos-mcp.config.json
+
+.DS_Store

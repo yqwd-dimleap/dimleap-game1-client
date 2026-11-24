@@ -1,0 +1,22 @@
+{
+  "name": "MyProject1",
+  "uuid": "90593544-5d9f-4a7c-8983-ab9fde2bf3b8",
+  "creator": {
+    "version": "3.8.8"
+  },
+  "scripts": {
+    "test": "node tools/verify-project.cjs && node tools/check-maps.cjs && node tools/check-prefabs.cjs && node tools/test-combat.cjs",
+    "test:combat": "node tools/test-combat.cjs",
+    "benchmark:combat": "node tools/test-combat.cjs --benchmark",
+    "verify": "node tools/verify-project.cjs && node tools/check-maps.cjs && node tools/check-prefabs.cjs",
+    "prepare:wx": "node tools/prepare-build.cjs wx",
+    "prepare:tt": "node tools/prepare-build.cjs tt",
+    "audit:wx": "node tools/audit-packages.cjs wx",
+    "audit:tt": "node tools/audit-packages.cjs tt",
+    "check:boundaries": "node tools/verify-project.cjs",
+    "stage:wx": "node tools/stage-release.cjs wx",
+    "stage:tt": "node tools/stage-release.cjs tt",
+    "check:prefabs": "node tools/check-prefabs.cjs",
+    "check:maps": "node tools/check-maps.cjs"
+  }
+}

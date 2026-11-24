@@ -1,0 +1,17 @@
+UI_gongxihuode.png
+size:1024,512
+filter:Linear,Linear
+pma:true
+de
+bounds:2,2,179,227
+rotate:90
+di
+bounds:2,183,550,307
+offsets:0,0,551,307
+gong
+bounds:554,296,209,194
+huo
+bounds:765,302,197,188
+xi
+bounds:231,41,140,184
+rotate:90

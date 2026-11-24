@@ -1,0 +1,16 @@
+{
+  "__version__": "1.0.6",
+  "general": {
+    "designResolution": {
+      "width": 750,
+      "height": 1334
+    }
+  },
+  "layer": [
+    {
+      "name": "BATTLE_WORLD",
+      "value": 2
+    }
+  ],
+  "custom_joint_texture_layouts": []
+}

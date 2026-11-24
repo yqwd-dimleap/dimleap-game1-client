@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0-prototype",
+  "minimumClientVersion": "0.2.0-prototype",
+  "apiBaseUrl": "http://127.0.0.1:3000/api/v1",
+  "remoteBaseUrl": { "web": "", "wx": "", "tt": "" },
+  "bundleVersions": {},
+  "bundles": {
+    "ui_bundle": { "delivery": "subpackage", "priority": 6, "dependencies": [] },
+    "heroes_bundle": { "delivery": "subpackage", "priority": 5, "dependencies": ["ui_bundle"] },
+    "battle_bundle": { "delivery": "subpackage", "priority": 5, "dependencies": ["ui_bundle"] },
+    "battle_ui_bundle": { "delivery": "remote", "priority": 4, "dependencies": ["ui_bundle"] },
+    "map_bundle": { "delivery": "remote", "priority": 4, "dependencies": [] },
+    "combat_content": { "delivery": "remote", "priority": 4, "dependencies": ["ui_bundle"] },
+    "season_content": { "delivery": "remote", "priority": 4, "dependencies": ["ui_bundle"] }
+  }
+}

@@ -1,0 +1,67 @@
+<% const firstDevice = devices[config.device] || devices.Default; const firstWidth = config.rotate ? firstDevice.height : firstDevice.width; const firstHeight = config.rotate ? firstDevice.width : firstDevice.height; %>
+<html>
+    <head>
+        <link rel="icon" href="./favicon.ico" />
+        <meta charset="utf-8" />
+        <title><%=title%></title>
+        <meta
+            name="viewport"
+            content="width=device-width,user-scalable=no,initial-scale=1,minimum-scale=1,maximum-scale=1,minimal-ui=true"
+        />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="full-screen" content="yes" />
+        <meta name="screen-orientation" content="portrait" />
+        <meta name="x5-fullscreen" content="true" />
+        <meta name="360-fullscreen" content="true" />
+        <meta name="renderer" content="webkit" />
+        <meta name="force-rendering" content="webkit" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+
+        <link rel="stylesheet" type="text/css" href="./index.css" />
+        <style>
+            <% if (firstWidth && firstHeight) { %>
+            #GameDiv.startup-sizing { width: <%= firstWidth %>px; height: <%= firstHeight %>px; }
+            <% } %>
+            #startup-cover { position: absolute; inset: 0; z-index: 20; background: #ddd0b4 url('./startup/loading_bg.jpg') center / cover no-repeat; }
+            #splash { display: none !important; }
+        </style>
+    </head>
+    <body style="overflow: hidden;">
+        <%- include(cocosToolBar, {config: config}) %>
+        <div id="content" class="content" style="overflow: hidden;">
+            <div class="contentWrap">
+                <div id="GameDiv" class="wrapper startup-sizing">
+                    <div id="Cocos3dGameContainer">
+                        <canvas id="GameCanvas" tabindex="-1" style="background-color: '';"></canvas>
+                    </div>
+                    <div id="startup-cover" aria-label="正在启动"></div>
+                    <div id="splash">
+                        <div class="progress-bar stripes"><span></span></div>
+                    </div>
+                    <div id="bulletin">
+                        <div id="sceneIsEmpty" class="inner"><%=tip_sceneIsEmpty%></div>
+                    </div>
+                    <div class="error" id="error">
+                        <div class="title">Error <i>(Please open the console to see detailed errors)</i></div>
+                        <div class="error-main"></div>
+                        <div class="error-stack"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <%- include(cocosTemplate, {}) %>
+        <script>
+            // Preview's default engine logo is independent of the build splash setting.
+            if (window._CCSettings && window._CCSettings.splashScreen) window._CCSettings.splashScreen.totalTime = 0;
+            window.__dismissStartupCover = function () {
+                var cover = document.getElementById('startup-cover');
+                if (cover) cover.remove();
+                document.getElementById('GameDiv').classList.remove('startup-sizing');
+                delete window.__dismissStartupCover;
+            };
+            window.addEventListener('error', function () { if (window.__dismissStartupCover) window.__dismissStartupCover(); });
+            window.addEventListener('unhandledrejection', function () { if (window.__dismissStartupCover) window.__dismissStartupCover(); });
+        </script>
+    </body>
+</html>

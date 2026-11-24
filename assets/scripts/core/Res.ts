@@ -1,0 +1,109 @@
+import { ResourceScope } from './ResourceScope';
+import type { ResourceLoader } from './ResourceScope';
+export type { ResourceLoader } from './ResourceScope';
+import { Asset, AssetManager, assetManager, Constructor } from 'cc';
+import { AppConfig } from './Config';
+import { PlatformKind } from '../sdk/Platform';
+import { EDITOR, PREVIEW } from 'cc/env';
+import { LoadQueue, LoadPriority, LoadQueueSnapshot } from './LoadQueue';
+
+export type LoadProgress = (finished: number, total: number) => void;
+export interface ResMetrics {
+    queue: LoadQueueSnapshot;
+    bundleRequests: number;
+    assetRequests: number;
+}
+interface SharedAssetLoad {
+    promise: Promise<Asset>;
+    cancellations: Set<() => boolean>;
+}
+
+/** Bundle names are loading boundaries. No scene or prefab references cross the bootstrap boundary. */
+export class Res {
+    private pending = new Map<string, Promise<AssetManager.Bundle>>();
+    private assets = new Map<Constructor<Asset>, Map<string, SharedAssetLoad>>();
+    private queue = new LoadQueue(6);
+    readonly application: ResourceScope;
+    constructor(private config: AppConfig, private platform: PlatformKind) {
+        this.application = this.createScope('application');
+    }
+    createScope(name: string): ResourceScope {
+        const loader: ResourceLoader = {
+            load: (bundle, path, type, progress, priority, cancelled) =>
+                this.loadAsset(bundle, path, type, progress, priority, cancelled),
+        };
+        return new ResourceScope(name, loader);
+    }
+    /** Explicit app-lifetime cache; scenes and views must load through their own scope. */
+    load<T extends Asset>(bundle: string, path: string, type: Constructor<T>, progress?: LoadProgress,
+        priority?: LoadPriority): Promise<T> {
+        return this.application.load(bundle, path, type, progress, priority);
+    }
+    metrics(): ResMetrics {
+        let assetRequests = 0;
+        for (const pending of this.assets.values()) assetRequests += pending.size;
+        return { queue: this.queue.snapshot(), bundleRequests: this.pending.size, assetRequests };
+    }
+    bundle(name: string): Promise<AssetManager.Bundle> {
+        const cached = assetManager.getBundle(name);
+        if (cached) return Promise.resolve(cached);
+        const inflight = this.pending.get(name);
+        if (inflight) return inflight;
+        const definition = this.config.bundles[name];
+        if (!definition) return Promise.reject(new Error(`未声明资源包：${name}`));
+        const remote = definition.delivery === 'remote';
+        const base = this.config.remoteBaseUrl[this.platform];
+        // Both browser preview and the editor Game View generate local bundle URLs.
+        const localPreview = PREVIEW || EDITOR;
+        // A local preview can use its generated bundle URL. Published remote content needs a real CDN.
+        if (remote && !base && !localPreview) return Promise.reject(new Error(`远程资源 ${name} 尚未配置 CDN`));
+        const source = remote && !localPreview ? `${base.replace(/\/$/, '')}/remote/${name}` : name;
+        const options = this.config.bundleVersions[name] ? { version: this.config.bundleVersions[name] } : {};
+        const task = Promise.all(definition.dependencies.map(dependency => this.bundle(dependency))).then(() => new Promise<AssetManager.Bundle>((resolve, reject) => {
+            assetManager.loadBundle(source, options, (error, bundle) => {
+                if (error) reject(new Error(`资源包 ${name} 加载失败：${error.message}`));
+                else resolve(bundle);
+            });
+        }));
+        this.pending.set(name, task);
+        const clear = (): void => { if (this.pending.get(name) === task) this.pending.delete(name); };
+        void task.then(clear, clear);
+        return task;
+    }
+    private async loadAsset<T extends Asset>(bundleName: string, path: string, type: Constructor<T>, progress?: LoadProgress,
+        priority: LoadPriority = 'normal', cancelled?: () => boolean): Promise<T> {
+        const key = `${bundleName}:${path}`;
+        let pending = this.assets.get(type);
+        if (!pending) { pending = new Map(); this.assets.set(type, pending); }
+        const shared = pending.get(key);
+        if (shared) {
+            if (cancelled) shared.cancellations.add(cancelled);
+            try {
+                const asset = await shared.promise as T;
+                progress?.(1, 1);
+                return asset;
+            } finally {
+                if (cancelled) shared.cancellations.delete(cancelled);
+            }
+        }
+        const cancellations = new Set<() => boolean>();
+        if (cancelled) cancellations.add(cancelled);
+        const created: SharedAssetLoad = {
+            cancellations,
+            promise: this.queue.schedule(async () => {
+                const bundle = await this.bundle(bundleName);
+                const cached = bundle.get(path, type);
+                if (cached) { progress?.(1, 1); return cached; }
+                return new Promise<T>((resolve, reject) => bundle.load(path, type,
+                    (finished, total) => progress?.(finished, total),
+                    (error, asset) => error ? reject(error) : resolve(asset)));
+            }, priority, () => cancellations.size > 0 && Array.from(cancellations).every(test => test())),
+        };
+        pending.set(key, created);
+        try { return await created.promise as T; }
+        finally {
+            if (cancelled) cancellations.delete(cancelled);
+            if (pending.get(key) === created) pending.delete(key);
+        }
+    }
+}

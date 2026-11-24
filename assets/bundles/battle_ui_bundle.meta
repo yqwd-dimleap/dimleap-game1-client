@@ -1,0 +1,14 @@
+{
+  "ver": "1.2.0",
+  "importer": "directory",
+  "imported": true,
+  "uuid": "4a5e70d8-1499-4ad8-ac6e-2836f196b4b7",
+  "files": [],
+  "subMetas": {},
+  "userData": {
+    "isBundle": true,
+    "bundleName": "battle_ui_bundle",
+    "priority": 4,
+    "bundleConfigID": "remote-content"
+  }
+}
