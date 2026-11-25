@@ -11,7 +11,7 @@ import { loadHeroCardFrame } from '../../ui/heroes/HeroCardFrame';
 import { BATTLE_TROOP_PATHS } from '../battle/BattleContent';
 import { HeroBattleGMPanel } from '../battle/presentation/HeroBattleGMPanel';
 import { GameApp } from '../GameApp';
-import { DEBUG } from 'cc/env';
+import { GM_VISIBLE } from '../../core/Gm';
 
 interface HeroGMInstance {
     node: Node;
@@ -54,12 +54,12 @@ export class HeroesController extends Component {
             },
         }, modals);
         const heroGMButton = this.node.getChildByName('btn_hero_gm');
-        if (heroGMButton && DEBUG) {
+        if (heroGMButton && GM_VISIBLE) {
             heroGMButton.on(Button.EventType.CLICK, this.openHeroGMClick);
             this.heroGMButton = heroGMButton;
         } else if (heroGMButton) {
             heroGMButton.active = false;
-        } else if (DEBUG) {
+        } else if (GM_VISIBLE) {
             console.warn('[Heroes] HeroCollection is missing btn_hero_gm');
         }
         // The authored page and default card art are already visible. Load portraits,
@@ -85,7 +85,7 @@ export class HeroesController extends Component {
         return { frames, levels, names };
     }
     private async openHeroGM(): Promise<void> {
-        if (!DEBUG) return;
+        if (!GM_VISIBLE) return;
         const resources = this.resources, modals = this.modals;
         if (this.disposed || !resources || !modals || this.heroGM || this.heroGMOpening) return;
         const request = ++this.heroGMOpenRequest;

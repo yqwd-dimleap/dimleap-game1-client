@@ -27,15 +27,6 @@ export class BattleWorldView extends Component {
         map.setSiblingIndex(0);
         map.setPosition(0, 0, 0);
         this.mapNode = map;
-        // Disable the placeholder art and zones once a complete map prefab is installed.
-        for (const name of ['ZoneBlue', 'ZoneRed', 'Zone_center']) {
-            const legacy = this.board.getChildByPath(`ZoneLayer/${name}`);
-            if (legacy) legacy.active = false;
-        }
-        const legacyBoard = this.board.getChildByPath('GroundLayer/BackgroundBoard');
-        if (legacyBoard) legacyBoard.active = false;
-        const legacyBackground = this.board.getChildByPath('EnvironmentLayer/Background');
-        if (legacyBackground) legacyBackground.active = false;
         return map;
     }
     private setLayer(node: Node, layer: number): void {

@@ -46,6 +46,7 @@ import { ArrowProjectiles } from './presentation/ArrowProjectiles';
 import { AimGuideView } from './presentation/AimGuideView';
 import { DeploymentEffects } from './presentation/DeploymentEffects';
 import { DEBUG } from 'cc/env';
+import { GM_VISIBLE } from '../../core/Gm';
 const { ccclass } = _decorator;
 interface Effect extends AttackEvent { life: number }
 
@@ -233,7 +234,7 @@ export class MatchController extends Component {
                 resources.load(BUNDLES.battleUi, SETTLEMENT_SPINE_PATH, sp.SkeletonData, undefined, 'normal'),
                 resources.load(BUNDLES.combatContent, SETTLEMENT_ART_PATHS.victory, SpriteFrame, undefined, 'normal'),
                 resources.load(BUNDLES.combatContent, SETTLEMENT_ART_PATHS.failure, SpriteFrame, undefined, 'normal'),
-                DEBUG ? resources.load(BUNDLES.battleUi, 'prefabs/BattleGM', Prefab, undefined, 'background') : Promise.resolve(null),
+                GM_VISIBLE ? resources.load(BUNDLES.battleUi, 'prefabs/BattleGM', Prefab, undefined, 'background') : Promise.resolve(null),
                 resources.load(BUNDLES.battleUi, 'prefabs/BattlePause', Prefab, undefined, 'normal'),
             ]);
             if (!isValid(this, true) || this.leaving) return;
@@ -271,7 +272,7 @@ export class MatchController extends Component {
                     ? { x: this.session.pending.node.position.x, y: this.session.pending.node.position.y } : null,
                 (dx, dy) => this.aim(dx, dy), (dx, dy) => this.release(dx, dy), () => this.clearAim(), this.camera.camera, this.node);
             game.on(Game.EVENT_HIDE, this.onHide, this); game.on(Game.EVENT_SHOW, this.onShow, this);
-            if (DEBUG && gmPrefab) {
+            if (GM_VISIBLE && gmPrefab) {
                 const gmRoot = instantiate(gmPrefab); hud.addChild(gmRoot);
                 this.gm = gmRoot.getComponent(BattleGMPanel) ?? undefined;
                 if (!this.gm) throw new Error('BattleGM requires BattleGMPanel');
@@ -283,7 +284,7 @@ export class MatchController extends Component {
                     this.syncVisualSpeed(open);
                 }, () => this.applyBattleTuning());
             }
-            if (!DEBUG) {
+            if (!GM_VISIBLE) {
                 const debugButton = hud.getChildByName('OpenHeroBattleGM');
                 if (debugButton) debugButton.active = false;
             }

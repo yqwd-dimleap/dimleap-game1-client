@@ -1,4 +1,5 @@
 import { _decorator, Button, Component, Label, Node, isValid, sp } from 'cc';
+import { GM_VISIBLE } from '../../../core/Gm';
 import { ViewNodes } from '../../../ui/binding/ViewNodes';
 import type { BattleMatch } from '../../../model/battle/BattleMatch';
 import type { Team } from '../../../model/battle/types';
@@ -39,8 +40,12 @@ export class BattleHUDView extends Component {
         this.nodes.at('battle_info/BluePlayerName', Label).string = match.blue.nickname;
         this.nodes.at('battle_info/RedPlayerName', Label).string = match.red.nickname;
         this.redWinNode = this.nodes.path('btn_red_win'); this.blueWinNode = this.nodes.path('btn_blue_win');
-        this.redWinNode.on(Button.EventType.CLICK, this.chooseRedWin);
-        this.blueWinNode.on(Button.EventType.CLICK, this.chooseBlueWin);
+        // 强制胜负只是 GM 工具，总开关关闭时整颗节点隐藏，避免误触。
+        this.redWinNode.active = GM_VISIBLE; this.blueWinNode.active = GM_VISIBLE;
+        if (GM_VISIBLE) {
+            this.redWinNode.on(Button.EventType.CLICK, this.chooseRedWin);
+            this.blueWinNode.on(Button.EventType.CLICK, this.chooseBlueWin);
+        }
         this.setSeriesLives([2, 2]);
     }
     showRound(round: number, team: Team, deploying = true): void {
