@@ -3,9 +3,11 @@ import type { MeritReward } from '../../model/config/GameTables';
 import type { HeroId } from '../../model/battle/types';
 import { GameTables, HERO_TABLE_IDS } from '../../model/config/GameTables';
 import { HERO_ICON_PATHS } from '../../model/hero/HeroPortraits';
+import { heroCardTier } from '../../model/hero/HeroProgress';
 import { ResourceScope } from '../../core/ResourceScope';
 import { BUNDLES } from '../../core/Bundles';
 import { visibleRewardItems } from '../../model/season/MeritRewards';
+import { loadHeroCardFrame } from '../heroes/HeroCardFrame';
 import { GoldRewardCardView } from './GoldRewardCardView';
 import { HeroRewardCardView } from './HeroRewardCardView';
 
@@ -52,7 +54,7 @@ export class RewardDetailView extends Component {
     async initialize(reward: MeritReward, resources: ResourceScope, goldPrefab: Prefab, heroPrefab: Prefab,
         presentation: RewardPresentation = 'detail'): Promise<void> {
         this.resources = resources;
-        this.uiTitle().string = `军功 ${reward.requiredMerit} 奖励`;
+        // this.uiTitle().string = `军功 ${reward.requiredMerit} 奖励`;
         this.host = this.node.getChildByName('RewardHost') ?? new Node('RewardHost');
         const background = this.node.getChildByName('bg_2');
         if (!background) throw new Error('RewardDetail requires bg_2');
@@ -81,12 +83,18 @@ export class RewardDetailView extends Component {
             const heroCard = card.getComponent(HeroRewardCardView);
             heroCard?.render(name, item.amount, null);
             const path = heroId ? HERO_ICON_PATHS[heroId] : undefined;
-            if (!path) continue;
-            iconLoads.push(resources.load(BUNDLES.heroes, path, SpriteFrame)
-                .then(icon => {
-                    if (!this.disposed && isValid(card, true)) heroCard?.render(name, item.amount, icon);
-                })
-                .catch(() => { /* The authored name fallback remains usable. */ }));
+            if (!heroId) continue;
+            const iconLoad = path
+                ? resources.load(BUNDLES.heroes, path, SpriteFrame).catch(() => null)
+                : Promise.resolve(null);
+            const frameLoad = loadHeroCardFrame(resources, heroCardTier(heroId))
+                .catch(error => {
+                    console.warn(`[Reward] hero frame unavailable for ${heroId}:`, error);
+                    return null;
+                });
+            iconLoads.push(Promise.all([iconLoad, frameLoad]).then(([icon, frame]) => {
+                if (!this.disposed && isValid(card, true)) heroCard?.render(name, item.amount, icon, frame);
+            }));
         }
 
         const rewardPresentation = presentation === 'reward';
@@ -96,7 +104,7 @@ export class RewardDetailView extends Component {
         if (title) title.active = !rewardPresentation;
         layoutCards(cards, rewardPresentation
             ? { scale: 1, columns: 3, columnGap: 185, rowGap: 245, centerY: -35 }
-            : { scale: .4, columns: 3, columnGap: 82, rowGap: 92, centerY: -28 });
+            : { scale: .5, columns: 3, columnGap: 120, rowGap: 120, centerY: -30 });
         this.host.setPosition(0, 0, 0);
         // Cards and amounts are visible before portrait textures finish loading.
         void Promise.all(iconLoads);

@@ -90,13 +90,13 @@ export const VS_ART_PATHS = {
     second: 'battle/vs/bg2/spriteFrame',
 } as const;
 export function battleContentPaths(ids: readonly string[]): string[] {
-    return [...new Set([
+    return Array.from(new Set([
         MATCH_SPINE_PATH,
         'battle/animations/dizuo/hu_hong_lan', 'battle/animations/dangong/nu_lan', 'battle/animations/dangong/nu_hong',
         'battle/animations/pengzhuang/zhuanjihuohua', 'battle/animations/zengbing/hu_hong_lan_tx', 'battle/animations/death/si_tongyong',
         ...ids.map(id => BATTLE_TROOP_PATHS[id]),
         ...ids.map(id => HERO_MELEE_EFFECTS[id as HeroId] ?? HERO_RANGED_ART[id as HeroId]?.path ?? '').filter(Boolean),
         ...ids.map(id => { const attack = rangedAttack(id as HeroId); return attack && !HERO_RANGED_ART[id as HeroId] ? `heroes/animations/batched/${attack.kind}` : ''; }).filter(Boolean),
-    ])];
+    ]));
 }
 export const BATTLE_CONTENT_PATHS = battleContentPaths(DEPLOYABLE_HERO_IDS);

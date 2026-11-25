@@ -109,7 +109,7 @@ export class MainPageRouter {
         this.activateShell(page, cached.node);
         this.active = page; cached.used = generation; cached.handle.show?.();
         while (this.pages.size > this.capacity) {
-            const candidate = [...this.pages].filter(([name]) => name !== this.active).sort((a, b) => a[1].used - b[1].used)[0];
+            const candidate = Array.from(this.pages).filter(([name]) => name !== this.active).sort((a, b) => a[1].used - b[1].used)[0];
             if (!candidate) break;
             this.release(candidate[0], candidate[1]);
         }

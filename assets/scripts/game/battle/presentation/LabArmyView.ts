@@ -66,7 +66,7 @@ export class LabArmyView {
             }
             if (view.node.parent !== parents[unit.team]) view.node.setParent(parents[unit.team]);
         }
-        if (added) [...this.bands.entries()].sort((a, b) => b[0] - a[0]).forEach(([, parents], i) => parents[0].parent!.setSiblingIndex(i));
+        if (added) Array.from(this.bands.entries()).sort((a, b) => b[0] - a[0]).forEach(([, parents], i) => parents[0].parent!.setSiblingIndex(i));
     }
     clear(): void {
         for (const { view, key } of this.active.values()) {

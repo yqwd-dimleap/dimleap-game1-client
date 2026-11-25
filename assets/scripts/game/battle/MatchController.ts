@@ -199,8 +199,9 @@ export class MatchController extends Component {
             const mapZones = mapRoot.getChildByName('ZoneLayer');
             if (!mapZones) throw new Error(`${mapDefinition.id} requires ZoneLayer`);
             this.mapView.bind(mapDefinition.id, mapZones, highlightEffect as EffectAsset);
-            this.mapView.randomizeZones = true;
-            this.mapView.layoutSeed = cloudBattle.map.zoneSeed;
+            // Fixed map prefabs are the visual and gameplay source of truth.
+            this.mapView.randomizeZones = false;
+            this.mapView.layoutSeed = 0;
             this.session.mapId = mapDefinition.id;
             // Finish the map before the first render, including while troop assets are loading.
             this.session.zones = this.mapView.layout(this.board);

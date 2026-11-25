@@ -1,9 +1,9 @@
 {
   "version": "0.2.0-prototype",
   "minimumClientVersion": "0.2.0-prototype",
-  "apiBaseUrl": "http://127.0.0.1:3000/api/v1",
-  "remoteBaseUrl": { "web": "", "wx": "", "tt": "" },
-  "bundleVersions": {},
+  "apiBaseUrl": "https://api.0ygame.cn/api/v1",
+  "devApiBaseUrl": "http://127.0.0.1:3000/api/v1",
+  "remoteBaseUrl": { "web": "https://0ygame.cn", "wx": "https://gameweb.0ygame.cn", "tt": "" },
   "bundles": {
     "ui_bundle": { "delivery": "subpackage", "priority": 6, "dependencies": [] },
     "heroes_bundle": { "delivery": "subpackage", "priority": 5, "dependencies": ["ui_bundle"] },

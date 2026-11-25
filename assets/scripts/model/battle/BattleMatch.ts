@@ -16,7 +16,7 @@ export function createBattleMatch(random = Math.random, now = Date.now(), player
 }
 /** Sample without replacement. Called once per selecting turn, never by render/update. */
 export function drawBattleHand(available: readonly HeroId[], random = Math.random): HeroId[] {
-    const pool = [...new Set(available)];
+    const pool = Array.from(new Set(available));
     for (let i = pool.length - 1; i > 0; i--) {
         const j = Math.floor(random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]];
     }

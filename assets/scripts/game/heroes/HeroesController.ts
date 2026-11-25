@@ -7,6 +7,7 @@ import { HERO_ICON_PATHS } from '../../model/hero/HeroPortraits';
 import { HeroProgressStore } from '../../model/hero/HeroProgress';
 import type { ModalPresenter } from '../../ui/common/ModalHost';
 import type { HeroCardArt } from '../../ui/heroes/HeroCardView';
+import { loadHeroCardFrame } from '../../ui/heroes/HeroCardFrame';
 import { BATTLE_TROOP_PATHS } from '../battle/BattleContent';
 import { HeroBattleGMPanel } from '../battle/presentation/HeroBattleGMPanel';
 import { GameApp } from '../GameApp';
@@ -77,7 +78,7 @@ export class HeroesController extends Component {
     }
     private async loadCardArt(resources: ResourceScope): Promise<HeroCardArt> {
         const [frames, levels, names] = await Promise.all([
-            Promise.all([0, 1, 2, 3].map(tier => resources.load(tier === 1 ? BUNDLES.ui : BUNDLES.heroes, tier === 1 ? 'textures/main/card_1/spriteFrame' : `textures/view/card_${tier}/spriteFrame`, SpriteFrame, undefined, 'background'))),
+            Promise.all(([0, 1, 2, 3] as const).map(frame => loadHeroCardFrame(resources, frame))),
             Promise.all([1, 2, 3].map(tier => resources.load(BUNDLES.heroes, `textures/view/lv_bg_${tier}/spriteFrame`, SpriteFrame, undefined, 'background'))),
             Promise.all([0, 1, 2, 3].map(tier => resources.load(BUNDLES.heroes, `textures/view/name_bg_${tier}/spriteFrame`, SpriteFrame, undefined, 'background'))),
         ]);

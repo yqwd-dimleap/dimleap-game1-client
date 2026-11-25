@@ -44,4 +44,6 @@ npm run stage:tt
 
 本地试构建使用 `--local`。正式构建前必须在 `config/release.json` 填写真实 AppID，并在 `assets/resources/config/app.json` 的 `remoteBaseUrl` 中填写微信/抖音 HTTPS CDN；缺少任一项时构建与发布暂存会直接失败。
 
+编辑器 Game View 与浏览器预览会自动改用 `app.json` 的 `devApiBaseUrl`（默认 `http://127.0.0.1:3000/api/v1`），真机构建和小游戏包始终使用 `apiBaseUrl`。预览需要连正式服时把 `devApiBaseUrl` 置空；该字段只接受 `127.0.0.1`/`localhost` 的 HTTP 地址。
+
 `verify` 检查 Bundle 元数据与清单、优先级、依赖方向/循环、跨包静态引用、脚本层依赖、动态资源路径、启动资源边界、远程包禁用脚本、空目录/临时文件和 Prefab 内部 ID。`check-maps` 检查 25 张地图清单、路径、ID 和 Prefab 文件集合是否一致；`check-prefabs` 检查 Prefab JSON、`.meta` 和组件 `fileId` 唯一性。

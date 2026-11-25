@@ -4,8 +4,9 @@ import { ViewNodes } from '../binding/ViewNodes';
 @_decorator.ccclass('HeroRewardCardView')
 export class HeroRewardCardView extends Component {
     private bindings?: ViewNodes;
-    render(name: string, amount: number, icon: SpriteFrame | null): void {
+    render(name: string, amount: number, icon: SpriteFrame | null, frame: SpriteFrame | null = null): void {
         const ui = this.bindings ??= new ViewNodes(this.node);
+        if (frame) ui.at('hero_frame', Sprite).spriteFrame = frame;
         const portrait = ui.at('hero/hero_icon', Sprite); portrait.spriteFrame = icon; portrait.enabled = !!icon;
         const fallback = ui.at('hero/hero_icon/Fallback', Label);
         fallback.string = name;

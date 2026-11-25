@@ -84,12 +84,12 @@ export class ArrowProjectiles {
     setSpeed(speed: number): void {
         if (speed === this.speed) return;
         this.speed = speed;
-        for (const node of [...this.active.values(), ...this.impacts.map(i => i.node)])
+        for (const node of [...Array.from(this.active.values()), ...this.impacts.map(i => i.node)])
             node.getChildByName('SpineVisual')!.getComponent(sp.Skeleton)!.timeScale =
                 (this.playbackRates.get(node) ?? 1) * speed;
     }
     clear(): void {
-        for (const node of [...this.active.values(), ...this.free, ...this.impacts.map(i => i.node)]) if (node.isValid) {
+        for (const node of [...Array.from(this.active.values()), ...this.free, ...this.impacts.map(i => i.node)]) if (node.isValid) {
             const skeleton = node.getChildByName('SpineVisual')?.getComponent(sp.Skeleton);
             if (skeleton) this.assets.detachBatch(skeleton);
             node.destroy();

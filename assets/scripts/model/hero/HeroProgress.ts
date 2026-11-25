@@ -35,12 +35,16 @@ export function upgradeCost(level: number): { coins: number; shards: number } {
     return { coins: row.next_level_gold, shards: row.next_level_fragments };
 }
 export function unlockCost(id: HeroId): number { return GameTables.current.hero(id).unlock_fragments; }
+export function heroCardTier(id: HeroId): 1 | 2 | 3 {
+    const tier = GameTables.current.hero(id).tier;
+    if (tier !== 1 && tier !== 2 && tier !== 3) throw new Error(`Unsupported hero card tier: ${id}/${tier}`);
+    return tier;
+}
 /** Card readiness describes fragments only. Actual cloud actions still validate both currencies. */
 export function heroCardState(id: HeroId, entry: HeroProgress, unlocked = entry.unlocked): {
     tier: 1 | 2 | 3; frame: 0 | 1 | 2 | 3; unlocked: boolean; max: boolean; ready: boolean; required: number; progress: number;
 } {
-    const tier = GameTables.current.hero(id).tier;
-    if (tier !== 1 && tier !== 2 && tier !== 3) throw new Error(`Unsupported hero card tier: ${id}/${tier}`);
+    const tier = heroCardTier(id);
     const max = !GameTables.current.canUpgrade(entry.level);
     const required = !unlocked ? unlockCost(id) : max ? 0 : upgradeCost(entry.level).shards;
     return { tier, frame: unlocked ? tier : 0, unlocked, max, required,

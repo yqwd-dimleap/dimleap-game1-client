@@ -2,7 +2,7 @@ import type { BattleMatch } from '../model/battle/BattleMatch';
 import { GameTables, GAME_TABLE_NAMES, TableDocuments } from '../model/config/GameTables';
 import { HeroProfile, HeroProgressStore, STARTER_LINEUP } from '../model/hero/HeroProgress';
 import { JsonAsset, resources, sys } from 'cc';
-import { AppConfig, parseConfig } from '../core/Config';
+import { AppConfig, parseConfig, resolveApiBaseUrl } from '../core/Config';
 import { EventBus } from '../core/EventBus';
 import { Res } from '../core/Res';
 import { PlayerSave, Save } from '../core/Save';
@@ -74,7 +74,7 @@ export class GameApp {
                 (error, value) => error ? reject(error) : resolve(value)));
             this.config = parseConfig(asset.json);
             this.res = new Res(this.config, this.platform.kind);
-            this.api = new Api(this.platform, this.config.apiBaseUrl);
+            this.api = new Api(this.platform, resolveApiBaseUrl(this.config));
             this.cloud = new CloudClient(this.api, this.platform);
             const rows = await Promise.all(GAME_TABLE_NAMES.map(async name => {
                 const json = await new Promise<JsonAsset>((resolve, reject) => {

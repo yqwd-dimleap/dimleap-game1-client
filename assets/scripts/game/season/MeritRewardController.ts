@@ -133,7 +133,7 @@ export class MeritRewardController {
     dispose(): void {
         if (this.disposed) return;
         this.disposed = true;
-        for (const [kind, entry] of [...this.entries]) {
+        for (const [kind, entry] of Array.from(this.entries)) {
             if (entry.node) this.modals.close(entry.node);
             else this.release(kind, entry);
         }
