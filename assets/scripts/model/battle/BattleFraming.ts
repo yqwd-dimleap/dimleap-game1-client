@@ -9,9 +9,23 @@ export const CAMERA_POSES: Record<CameraStage, CameraPose> = {
     flight: { x: 0, y: 0, height: 600 },
     combat: { x: 0, y: 0, height: 730 },
 };
+/** Every authored map prefab is 900x1650 and centred on the board (map_bundle/prefabs). */
+export const MAP_ART_HEIGHT = 1650;
+
 export function framingHeight(height: number, aspect: number): number {
+    const safe = Math.max(0.1, aspect);
     // Keep the entire arena width on tall devices; preserve each stage's relative zoom.
-    return height * Math.max(1, (750 / 1334) / Math.max(0.1, aspect));
+    const zoomed = height * Math.max(1, (750 / 1334) / safe);
+    // Never look past the map art vertically: the world camera would otherwise
+    // clear around it and expose that colour as a band at the screen edge.
+    // Phone aspects stay below 0.562, so the width never exceeds the 900 art here.
+    return Math.min(zoomed, MAP_ART_HEIGHT / 2);
+}
+
+/** The vertical pan may only use the margin the map art still covers. */
+export function framingPan(y: number, height: number): number {
+    const limit = Math.max(0, MAP_ART_HEIGHT / 2 - height);
+    return clamp(y, -limit, limit);
 }
 export const aimStage = (team: Team): CameraStage => team === 0 ? 'blue-aim' : 'red-aim';
 

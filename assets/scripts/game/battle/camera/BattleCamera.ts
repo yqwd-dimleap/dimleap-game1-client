@@ -1,5 +1,5 @@
 import { Camera } from 'cc';
-import { CameraStage, FramingTrack, framingHeight } from '../../../model/battle/BattleFraming';
+import { CameraStage, FramingTrack, framingHeight, framingPan } from '../../../model/battle/BattleFraming';
 
 /** Only the world camera moves. Physics and screen HUD keep their own coordinates. */
 export class BattleCamera {
@@ -10,7 +10,9 @@ export class BattleCamera {
     update(dt: number): void { this.track.update(dt); this.apply(); }
     private apply(): void {
         const p = this.track.pose;
-        this.camera.node.setPosition(p.x, p.y, 1000); this.camera.orthoHeight = framingHeight(p.height, this.camera.camera?.aspect ?? 750 / 1334);
+        const height = framingHeight(p.height, this.camera.camera?.aspect ?? 750 / 1334);
+        this.camera.node.setPosition(p.x, framingPan(p.y, height), 1000);
+        this.camera.orthoHeight = height;
     }
     snapshot(): object { return { stage: this.track.stage, moving: this.moving, ...this.track.pose, actualHeight: this.camera.orthoHeight }; }
 }
