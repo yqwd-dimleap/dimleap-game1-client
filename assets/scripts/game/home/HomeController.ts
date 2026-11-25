@@ -108,7 +108,7 @@ export class HomeController extends UIBase {
             if (!this.mountOverlay) throw new Error('Home overlay host missing');
             this.mountOverlay(this.matching);
             const view = this.matching.getComponent(MatchView)!; view.initialize(match, avatars as SpriteFrame[]);
-            void scope.load(BUNDLES.combatContent, MATCH_SPINE_PATH, sp.SkeletonData).then(data => {
+            void scope.load(BUNDLES.battleUi, MATCH_SPINE_PATH, sp.SkeletonData).then(data => {
                 if (isValid(view, true)) view.animate(data);
             }).catch(error => { if (isValid(view, true)) view.fail(error); });
             await SceneFlow.instance.enter('battle', state => { if (isValid(view, true)) view.progress(state.progress); });

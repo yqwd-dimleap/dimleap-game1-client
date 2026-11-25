@@ -1,6 +1,7 @@
 /** Runtime bundle names shared by loading, routing, and feature code. */
 export const BUNDLES = {
     ui: 'ui_bundle',
+    settings: 'settings_ui',
     heroes: 'heroes_bundle',
     battle: 'battle_bundle',
     battleUi: 'battle_ui_bundle',

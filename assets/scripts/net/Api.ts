@@ -1,3 +1,4 @@
+import { DEBUG } from 'cc/env';
 import { HttpOptions, Platform, PlatformRequestError } from '../sdk/Platform';
 
 export interface ErrorEnvelope {
@@ -34,7 +35,7 @@ export class Api {
                     ...(this.token ? { authorization: `Bearer ${this.token}` } : {}),
                 },
             });
-            console.info(`[Api] ${method} ${url} ${Date.now() - started}ms`);
+            if (DEBUG) console.info(`[Api] ${method} ${url} ${Date.now() - started}ms`);
             return response.data as T;
         } catch (error) {
             if (error instanceof PlatformRequestError) {

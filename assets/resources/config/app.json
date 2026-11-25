@@ -6,6 +6,7 @@
   "remoteBaseUrl": { "web": "https://0ygame.cn", "wx": "https://gameweb.0ygame.cn", "tt": "" },
   "bundles": {
     "ui_bundle": { "delivery": "subpackage", "priority": 6, "dependencies": [] },
+    "settings_ui": { "delivery": "subpackage", "priority": 5, "dependencies": ["ui_bundle"] },
     "heroes_bundle": { "delivery": "subpackage", "priority": 5, "dependencies": ["ui_bundle"] },
     "battle_bundle": { "delivery": "subpackage", "priority": 5, "dependencies": ["ui_bundle"] },
     "battle_ui_bundle": { "delivery": "remote", "priority": 4, "dependencies": ["ui_bundle"] },

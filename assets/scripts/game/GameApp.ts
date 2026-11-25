@@ -12,6 +12,8 @@ import type {
     CloudBattleResult, CloudBattleStart, CloudBootstrap, CloudHeroMutation, CloudLeaderboard, CloudMeritClaim,
 } from '../net/CloudTypes';
 import { createPlatform } from '../sdk/PlatformFactory';
+import { MemoryGuard } from '../sdk/MemoryGuard';
+import { bindCoinWallet } from '../ui/main/PlayerGoldView';
 import { StartupTrace } from '../core/StartupTrace';
 import { assertCompatibleVersion, CLIENT_VERSION } from '../model/config/BuildInfo';
 import { SeasonStore } from '../model/season/SeasonStore';
@@ -67,6 +69,7 @@ export class GameApp {
         if (this.initialized) return Promise.resolve();
         if (this.pending) return this.pending;
         this.pending = (async () => {
+            MemoryGuard.install();
             this.cleanupLegacyStorage();
             const local = this.save.read();
             this.player = { ...this.player, sound: local.sound };
@@ -122,8 +125,13 @@ export class GameApp {
                 await this.refreshBootstrap();
                 return { ok: result.claimed, message: result.claimed ? '军功奖励已领取' : '奖励不可领取' };
             });
+            bindCoinWallet({
+                coins: () => this.heroes.snapshot().coins,
+                subscribe: listener => this.heroes.subscribe(listener),
+            });
             this.initialized = true;
             if (DEBUG) {
+                (globalThis as any).__runeMemory = { snapshot: () => MemoryGuard.snapshot() };
                 (globalThis as any).__runeCloud = {
                     snapshot: () => ({
                         profile: this.profile,

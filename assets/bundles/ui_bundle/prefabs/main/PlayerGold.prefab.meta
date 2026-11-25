@@ -2,12 +2,12 @@
   "ver": "1.1.50",
   "importer": "prefab",
   "imported": true,
-  "uuid": "4a2a13a4-e20d-4314-8080-ed1eb3cfc513",
+  "uuid": "e4cd64b2-4cc5-4ef0-a853-d3c1a8cd6721",
   "files": [
     ".json"
   ],
   "subMetas": {},
   "userData": {
-    "syncNodeName": "TopNav"
+    "syncNodeName": "PlayerGold"
   }
 }

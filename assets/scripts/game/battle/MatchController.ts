@@ -8,7 +8,7 @@ import { BattlePauseView } from './presentation/BattlePauseView';
 import { createBattleMatch, matchSearchWait, MATCH_TIMING } from '../../model/battle/BattleMatch';
 import type { BattleMatch } from '../../model/battle/BattleMatch';
 import { HERO_ICON_PATHS } from '../../model/hero/HeroPortraits';
-import { MATCH_SPINE_PATH, SETTLEMENT_ART_PATHS, SETTLEMENT_SPINE_PATH, VS_ART_PATHS, battleMapById } from './BattleContent';
+import { MATCH_SPINE_PATH, SETTLEMENT_ART_PATHS, SETTLEMENT_SPINE_PATH, battleMapById } from './BattleContent';
 import { TEAM_COLORS } from '../../ui/theme/BattleTheme';
 import { CombatRunner } from './combat/CombatRunner';
 import { BattleSession } from './BattleSession';
@@ -212,15 +212,14 @@ export class MatchController extends Component {
             this.match = match; this.avatars = avatars as SpriteFrame[];
             this.matching.initialize(match, this.avatars as SpriteFrame[], () => { void this.returnHome(); });
             // Defer battle input until both real assets and the transition animation are ready.
-            const matchAnimation = resources.load(BUNDLES.combatContent, MATCH_SPINE_PATH, sp.SkeletonData, undefined, 'normal');
+            const matchAnimation = resources.load(BUNDLES.battleUi, MATCH_SPINE_PATH, sp.SkeletonData, undefined, 'normal');
             void matchAnimation.then(data => { if (isValid(this.matching, true)) this.matching!.animate(data); }).catch(() => {});
             let gmPrefab: Prefab | null = null, pausePrefab: Prefab, handPrefab: Prefab, cardPrefab: Prefab, settlementPrefab: Prefab;
             let roundSettlementPrefab: Prefab, vsPrefab: Prefab, arrowPrefab: Prefab;
             let blueLine: SpriteFrame, redLine: SpriteFrame;
             let settlementData: sp.SkeletonData, victoryArt: SpriteFrame, failureArt: SpriteFrame;
-            let vsFirstArt: SpriteFrame, vsSecondArt: SpriteFrame;
             [this.tokenPrefab, this.unitPrefab, handPrefab, cardPrefab, settlementPrefab, roundSettlementPrefab, vsPrefab, arrowPrefab, blueLine, redLine,
-                settlementData, victoryArt, failureArt, vsFirstArt, vsSecondArt, gmPrefab, pausePrefab] = await Promise.all([
+                settlementData, victoryArt, failureArt, gmPrefab, pausePrefab] = await Promise.all([
                 resources.load(BUNDLES.battle, 'prefabs/HeroToken', Prefab, undefined, 'critical'),
                 resources.load(BUNDLES.battle, 'prefabs/Unit', Prefab, undefined, 'critical'),
                 resources.load(BUNDLES.battleUi, 'prefabs/BattleHand', Prefab, undefined, 'normal'),
@@ -234,8 +233,6 @@ export class MatchController extends Component {
                 resources.load(BUNDLES.battleUi, SETTLEMENT_SPINE_PATH, sp.SkeletonData, undefined, 'normal'),
                 resources.load(BUNDLES.combatContent, SETTLEMENT_ART_PATHS.victory, SpriteFrame, undefined, 'normal'),
                 resources.load(BUNDLES.combatContent, SETTLEMENT_ART_PATHS.failure, SpriteFrame, undefined, 'normal'),
-                resources.load(BUNDLES.combatContent, VS_ART_PATHS.first, SpriteFrame, undefined, 'normal'),
-                resources.load(BUNDLES.combatContent, VS_ART_PATHS.second, SpriteFrame, undefined, 'normal'),
                 DEBUG ? resources.load(BUNDLES.battleUi, 'prefabs/BattleGM', Prefab, undefined, 'background') : Promise.resolve(null),
                 resources.load(BUNDLES.battleUi, 'prefabs/BattlePause', Prefab, undefined, 'normal'),
             ]);
@@ -303,7 +300,7 @@ export class MatchController extends Component {
             const vs = vsNode.getComponent(VSView);
             if (!vs) throw new Error('VSView requires VSView component');
             matchNode.active = false;
-            await vs.play(match, avatars as SpriteFrame[], animation, vsFirstArt, vsSecondArt);
+            await vs.play(match, avatars as SpriteFrame[], animation);
             if (!isValid(this, true) || this.leaving) return;
             vsNode.destroy(); matchNode.destroy(); this.matching = undefined;
             this.matchStage = 'battle'; this.hud.node.active = true; this.world.camera.enabled = true;

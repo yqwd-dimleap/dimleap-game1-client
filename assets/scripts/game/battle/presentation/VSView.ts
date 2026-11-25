@@ -1,15 +1,13 @@
-import { _decorator, Component, isValid, Sprite, SpriteFrame, sp } from 'cc';
+import { _decorator, Component, isValid, SpriteFrame, sp } from 'cc';
 import { ViewNodes } from '../../../ui/binding/ViewNodes';
 import { BattleMatch, MATCH_TIMING } from '../../../model/battle/BattleMatch';
 import { PlayerBadgeView } from './PlayerBadgeView';
 @_decorator.ccclass('VSView')
 export class VSView extends Component {
     private cancel?: () => void;
-    async play(match: BattleMatch, avatars: SpriteFrame[], data: sp.SkeletonData,
-        firstArt: SpriteFrame, secondArt: SpriteFrame): Promise<void> {
+    async play(match: BattleMatch, avatars: SpriteFrame[], data: sp.SkeletonData): Promise<void> {
+        // VS backgrounds are authored on the prefab; only player badges are data-driven.
         const ui = new ViewNodes(this.node);
-        ui.at('bg/bg1', Sprite).spriteFrame = firstArt;
-        ui.at('bg/bg2', Sprite).spriteFrame = secondArt;
         ui.at('BluePlayer2', PlayerBadgeView).render(match.blue, avatars[match.blue.avatar - 1]);
         ui.at('RedPlayer2', PlayerBadgeView).render(match.red, avatars[match.red.avatar - 1]);
         const spine = ui.at('vs_ani', sp.Skeleton); spine.skeletonData = data;

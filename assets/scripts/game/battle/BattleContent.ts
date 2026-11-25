@@ -41,7 +41,8 @@ export function setupCenter(header?: { x: number; y: number; width: number; heig
         !(header.width > 0) || !(header.height > 0)) return undefined;
     return { x: header.x + header.width / 2, y: header.y + header.height / 2 };
 }
-export const MATCH_SPINE_PATH = 'battle/animations/pipei/UI_pipei_VS';
+/** VS spine ships with battle_ui_bundle and is authored on MatchView/VSView. */
+export const MATCH_SPINE_PATH = 'animations/pipei/UI_pipei_VS';
 export const SETTLEMENT_SPINE_PATH = 'animations/shengli_shibai/UI_shengli_shibai';
 export interface BattleMapDefinition { id: string; name: string; path: string }
 /** Authored maps live in map_bundle; the schematic PNGs are editor references only. */
@@ -85,13 +86,8 @@ export const SETTLEMENT_ART_PATHS = {
     victory: 'battle/results/shengli_icon/spriteFrame',
     failure: 'battle/results/shibai_icon/spriteFrame',
 } as const;
-export const VS_ART_PATHS = {
-    first: 'battle/vs/bg1/spriteFrame',
-    second: 'battle/vs/bg2/spriteFrame',
-} as const;
 export function battleContentPaths(ids: readonly string[]): string[] {
     return Array.from(new Set([
-        MATCH_SPINE_PATH,
         'battle/animations/dizuo/hu_hong_lan', 'battle/animations/dangong/nu_lan', 'battle/animations/dangong/nu_hong',
         'battle/animations/pengzhuang/zhuanjihuohua', 'battle/animations/zengbing/hu_hong_lan_tx', 'battle/animations/death/si_tongyong',
         ...ids.map(id => BATTLE_TROOP_PATHS[id]),

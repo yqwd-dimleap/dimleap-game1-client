@@ -4,7 +4,7 @@ export type { ResourceLoader } from './ResourceScope';
 import { Asset, AssetManager, assetManager, Constructor } from 'cc';
 import { AppConfig } from './Config';
 import { PlatformKind } from '../sdk/Platform';
-import { EDITOR, PREVIEW } from 'cc/env';
+import { DEBUG, EDITOR, PREVIEW } from 'cc/env';
 import { LoadQueue, LoadPriority, LoadQueueSnapshot } from './LoadQueue';
 
 export type LoadProgress = (finished: number, total: number) => void;
@@ -64,14 +64,14 @@ export class Res {
         const label = remote && !localPreview ? 'remote' : 'local';
         const task = Promise.all(definition.dependencies.map(dependency => this.bundle(dependency))).then(() => new Promise<AssetManager.Bundle>((resolve, reject) => {
             const started = Date.now();
-            console.info(`[Res] bundle ${name} (${label}) <- ${source}`);
+            if (DEBUG) console.info(`[Res] bundle ${name} (${label}) <- ${source}`);
             assetManager.loadBundle(source, options, (error, bundle) => {
                 const cost = Date.now() - started;
                 if (error) {
                     console.warn(`[Res] bundle ${name} (${label}) failed in ${cost}ms: ${error.message} <- ${source}`);
                     reject(new Error(`资源包 ${name} 加载失败：${error.message}`));
                 } else {
-                    console.info(`[Res] bundle ${name} (${label}) ready in ${cost}ms`);
+                    if (DEBUG) console.info(`[Res] bundle ${name} (${label}) ready in ${cost}ms`);
                     resolve(bundle);
                 }
             });

@@ -18,7 +18,6 @@ export class HomeShellController extends Component {
     private router?: MainPageRouter;
     private shell?: MainShellView;
     private selection = 0;
-    private currencyOff?: () => void;
     async start(): Promise<void> {
         try {
             const app = GameApp.instance;
@@ -26,12 +25,10 @@ export class HomeShellController extends Component {
             await app.prepareSession();
             if (!isValid(this, true)) return;
             this.resources = SceneFlow.instance.resourcesFor('home');
-            const [prefab, topPrefab, modalPrefab] = await Promise.all([this.resources.load(BUNDLES.ui, 'prefabs/main/MainShell', Prefab),
-                this.resources.load(BUNDLES.ui, 'prefabs/main/TopNav', Prefab),
+            const [prefab, modalPrefab] = await Promise.all([this.resources.load(BUNDLES.ui, 'prefabs/main/MainShell', Prefab),
                 this.resources.load(BUNDLES.ui, 'prefabs/common/ModalLayer', Prefab)]);
             if (!isValid(this, true)) return;
             const view = instantiate(prefab); this.node.addChild(view);
-            if (!view.getChildByName('TopNav')) view.addChild(instantiate(topPrefab));
             this.shell = view.getComponent(MainShellView) ?? undefined;
             if (!this.shell) throw new Error('MainShell requires MainShellView');
             this.shell.initialize(page => { void this.select(page); });
@@ -39,8 +36,6 @@ export class HomeShellController extends Component {
             const modals = modalNode.getComponent(ModalHost);
             if (!modals) throw new Error('ModalLayer requires ModalHost');
             modals.initialize();
-            const refreshCurrency = (): void => { if (this.shell && isValid(this.shell, true)) this.shell.currency(app.heroes.snapshot().coins); };
-            refreshCurrency(); this.currencyOff = app.heroes.subscribe(refreshCurrency);
             this.router = new MainPageRouter(this.shell.host, app.res, {
                 home: { bundle: BUNDLES.ui, path: 'prefabs/home/HomeView', create: async (root, scope) => {
                     const controller = root.getComponent(HomeController);
@@ -91,7 +86,7 @@ export class HomeShellController extends Component {
         }
     }
     onDestroy(): void {
-        this.selection++; this.currencyOff?.(); this.currencyOff = undefined;
+        this.selection++;
         try { this.router?.destroy(); } finally { this.shell?.dispose(); this.resources?.dispose(); }
         this.router = undefined; this.shell = undefined; this.resources = undefined;
     }
