@@ -1,8 +1,10 @@
 nu_lanaaa.png
-size:128,64
+size:128,128
 filter:Linear,Linear
 pma:true
 scale:0.5
 20261125-151534
 bounds:2,2,38,113
-rotate:90
+Q版手背指向手 4
+bounds:42,49,78,66
+offsets:3,8,85,89

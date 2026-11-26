@@ -130,9 +130,6 @@
     "fixAlphaTransparencyArtifacts": false,
     "hasAlpha": true,
     "redirect": "e313eb51-b02c-41c3-acd6-ea0fddf69265@6c48a",
-    "compressSettings": {
-      "useCompressTexture": true,
-      "presetId": "map-alpha"
-    }
+    "compressSettings": {}
   }
 }

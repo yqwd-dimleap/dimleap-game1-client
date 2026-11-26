@@ -1,7 +1,7 @@
 import { ResourceScope } from './ResourceScope';
 import type { ResourceLoader } from './ResourceScope';
 export type { ResourceLoader } from './ResourceScope';
-import { Asset, AssetManager, assetManager, Constructor } from 'cc';
+import { Asset, AssetManager, assetManager, Constructor, SceneAsset } from 'cc';
 import { AppConfig } from './Config';
 import { PlatformKind } from '../sdk/Platform';
 import { DEBUG, EDITOR, PREVIEW } from 'cc/env';
@@ -16,6 +16,11 @@ export interface ResMetrics {
 interface SharedAssetLoad {
     promise: Promise<Asset>;
     cancellations: Set<() => boolean>;
+}
+
+function missingBundle(error: unknown): string | undefined {
+    const message = error instanceof Error ? error.message : String(error);
+    return /Please load bundle ([a-z][a-z0-9_]*) first/.exec(message)?.[1];
 }
 
 /** Bundle names are loading boundaries. No scene or prefab references cross the bootstrap boundary. */
@@ -62,7 +67,7 @@ export class Res {
         // bundles; pinning them in app.json drifts after every rebuild and 404s the config fetch.
         const options: { version?: string } = {};
         const label = remote && !localPreview ? 'remote' : 'local';
-        const task = Promise.all(definition.dependencies.map(dependency => this.bundle(dependency))).then(() => new Promise<AssetManager.Bundle>((resolve, reject) => {
+        const task = this.ensureDependencies(definition.dependencies).then(() => new Promise<AssetManager.Bundle>((resolve, reject) => {
             const started = Date.now();
             if (DEBUG) console.info(`[Res] bundle ${name} (${label}) <- ${source}`);
             assetManager.loadBundle(source, options, (error, bundle) => {
@@ -70,16 +75,53 @@ export class Res {
                 if (error) {
                     console.warn(`[Res] bundle ${name} (${label}) failed in ${cost}ms: ${error.message} <- ${source}`);
                     reject(new Error(`资源包 ${name} 加载失败：${error.message}`));
-                } else {
+                    return;
+                }
+                // The generated bundle metadata is authoritative. It can contain a dependency
+                // that is newer than app.json during a partial rollout, and WeChat resolves
+                // redirected assets lazily while the first prefab is parsed.
+                void this.ensureDependencies(bundle.deps || []).then(() => {
                     if (DEBUG) console.info(`[Res] bundle ${name} (${label}) ready in ${cost}ms`);
                     resolve(bundle);
-                }
+                }, reject);
             });
         }));
         this.pending.set(name, task);
         const clear = (): void => { if (this.pending.get(name) === task) this.pending.delete(name); };
         void task.then(clear, clear);
         return task;
+    }
+    loadScene(bundleName: string, sceneName: string, progress?: LoadProgress): Promise<SceneAsset> {
+        return this.withBundleRetry(bundleName, bundle => new Promise<SceneAsset>((resolve, reject) => {
+            bundle.loadScene(sceneName, (finished, total) => progress?.(finished, total),
+                (error, scene) => error ? reject(error) : resolve(scene));
+        }));
+    }
+    private async ensureDependencies(dependencies: readonly string[]): Promise<void> {
+        const unique = Array.from(new Set(dependencies));
+        for (const dependency of unique) {
+            await this.bundle(dependency);
+            if (!assetManager.getBundle(dependency))
+                throw new Error(`资源包依赖未注册：${dependency}`);
+        }
+    }
+    /**
+     * WeChat resolves redirected assets after a bundle has loaded. If its subpackage
+     * registration is briefly unavailable, load the named dependency once and retry.
+     */
+    private async withBundleRetry<T>(bundleName: string, load: (bundle: AssetManager.Bundle) => Promise<T>): Promise<T> {
+        const recovered = new Set<string>();
+        for (;;) {
+            try {
+                return await load(await this.bundle(bundleName));
+            } catch (error) {
+                const dependency = missingBundle(error);
+                if (!dependency || recovered.has(dependency)) throw error;
+                recovered.add(dependency);
+                console.warn(`[Res] ${bundleName} requires ${dependency}; loading dependency and retrying`);
+                await this.bundle(dependency);
+            }
+        }
     }
     private async loadAsset<T extends Asset>(bundleName: string, path: string, type: Constructor<T>, progress?: LoadProgress,
         priority: LoadPriority = 'normal', cancelled?: () => boolean): Promise<T> {
@@ -102,12 +144,13 @@ export class Res {
         const created: SharedAssetLoad = {
             cancellations,
             promise: this.queue.schedule(async () => {
-                const bundle = await this.bundle(bundleName);
-                const cached = bundle.get(path, type);
-                if (cached) { progress?.(1, 1); return cached; }
-                return new Promise<T>((resolve, reject) => bundle.load(path, type,
-                    (finished, total) => progress?.(finished, total),
-                    (error, asset) => error ? reject(error) : resolve(asset)));
+                return this.withBundleRetry(bundleName, bundle => {
+                    const cached = bundle.get(path, type);
+                    if (cached) { progress?.(1, 1); return Promise.resolve(cached); }
+                    return new Promise<T>((resolve, reject) => bundle.load(path, type,
+                        (finished, total) => progress?.(finished, total),
+                        (error, asset) => error ? reject(error) : resolve(asset)));
+                });
             }, priority, () => cancellations.size > 0 && Array.from(cancellations).every(test => test())),
         };
         pending.set(key, created);

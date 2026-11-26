@@ -23,10 +23,7 @@
     "removeTextureInBundle": true,
     "removeImageInBundle": true,
     "removeSpriteAtlasInBundle": true,
-    "compressSettings": {
-      "useCompressTexture": true,
-      "presetId": "map-alpha"
-    },
+    "compressSettings": {},
     "textureSetting": {
       "wrapModeS": "repeat",
       "wrapModeT": "repeat",

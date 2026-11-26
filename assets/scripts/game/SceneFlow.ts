@@ -36,8 +36,7 @@ export class SceneFlow {
                 const bundle = assetManager.getBundle('main');
                 if (!bundle) throw new Error('主资源包尚未就绪');
                 const [scene] = await Promise.all([
-                    new Promise<SceneAsset>((resolve, reject) => bundle.loadScene('main',
-                        () => {}, (error, asset) => error ? reject(error) : resolve(asset))),
+                    app.res.loadScene('main', 'main'),
                     scope.load(BUNDLES.ui, 'prefabs/main/MainShell', Prefab, undefined, 'background'),
                     scope.load(BUNDLES.ui, 'prefabs/home/HomeView', Prefab, undefined, 'background'),
                     scope.load(BUNDLES.ui, 'prefabs/common/ModalLayer', Prefab, undefined, 'background'),
@@ -142,16 +141,13 @@ export class SceneFlow {
                     }, 'critical').then(() => progress(0.32, '地图预加载完成')),
                 ]);
             }
-            const bundle = target.bundle === 'main' ? assetManager.getBundle('main') : await app.res.bundle(target.bundle);
-            if (!bundle) throw new Error('主资源包尚未就绪');
             for (let i = 0; i < target.prefabs.length; i++) {
                 await incoming.load(target.bundle, target.prefabs[i], Prefab, (finished, total) =>
                     progress(0.32 + 0.2 * (i + (total ? finished / total : 0)) / target.prefabs.length, '加载英雄与部队'), 'critical');
             }
             progress(0.52, '加载战斗场景');
-            const scene = preparedHome?.scene ?? await new Promise<SceneAsset>((resolve, reject) => bundle.loadScene(target.scene,
-                (finished, total) => progress(0.52 + 0.47 * (total ? finished / total : 0), '加载场景依赖'),
-                (error, asset) => error ? reject(error) : resolve(asset)));
+            const scene = preparedHome?.scene ?? await app.res.loadScene(target.bundle, target.scene,
+                (finished, total) => progress(0.52 + 0.47 * (total ? finished / total : 0), '加载场景依赖'));
             if (!preparedHome) incoming.retain(scene);
             progress(1, '加载完成');
             this.active = { route, scope: incoming };
