@@ -8,7 +8,7 @@
   "userData": {
     "isBundle": true,
     "bundleName": "battle_ui_bundle",
-    "priority": 4,
-    "bundleConfigID": "remote-content"
+    "priority": 5,
+    "bundleConfigID": "local-gameplay"
   }
 }

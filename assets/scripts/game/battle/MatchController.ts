@@ -48,6 +48,7 @@ import { ArrowProjectiles } from './presentation/ArrowProjectiles';
 import { AimGuideView } from './presentation/AimGuideView';
 import { DeploymentEffects } from './presentation/DeploymentEffects';
 import { NewbieGuideView } from './tutorial/NewbieGuideView';
+import { RemoteContentPrewarm } from './tutorial/RemotePrewarm';
 import { DEBUG } from 'cc/env';
 import { GM_VISIBLE } from '../../core/Gm';
 const { ccclass } = _decorator;
@@ -240,10 +241,13 @@ export class MatchController extends Component {
                 this.world.camera.enabled = true;
             }
             const matchAnimation = resources.load(BUNDLES.battleUi, MATCH_SPINE_PATH, sp.SkeletonData, undefined, 'normal');
-            const [matchPrefab, avatars] = await Promise.all([
+            const [matchPrefab, avatars, tutorialVsPrefab] = await Promise.all([
                 tutorialBattle ? Promise.resolve(null) :
                     resources.load(BUNDLES.battleUi, 'prefabs/MatchView', Prefab, undefined, 'critical'),
                 loadPlayerAvatars(resources, 'critical'),
+                tutorialBattle ?
+                    resources.load(BUNDLES.battleUi, 'prefabs/VSView', Prefab, undefined, 'critical') :
+                    Promise.resolve(null),
             ]);
             if (!isValid(this, true) || this.leaving) return;
             this.match = match; this.avatars = avatars as SpriteFrame[];
@@ -255,8 +259,23 @@ export class MatchController extends Component {
                 // Defer battle input until both real assets and the transition animation are ready.
                 void matchAnimation.then(data => { if (isValid(this.matching, true)) this.matching!.animate(data); }).catch(() => {});
             }
+            let earlyVsNode: Node | null = null;
+            let earlyVsPlayback: Promise<void> | null = null;
+            if (tutorialBattle) {
+                if (!tutorialVsPrefab) throw new Error('Tutorial requires battle_ui_bundle/prefabs/VSView');
+                const animation = await matchAnimation;
+                if (!isValid(this, true) || this.leaving) return;
+                earlyVsNode = instantiate(tutorialVsPrefab); this.setUILayer(earlyVsNode); this.node.addChild(earlyVsNode);
+                const vs = earlyVsNode.getComponent(VSView);
+                if (!vs) throw new Error('VSView requires VSView component');
+                earlyVsPlayback = vs.play(match, this.avatars as SpriteFrame[], animation);
+                // The remaining battle resources load while the VS animation covers the transition.
+                void earlyVsPlayback.catch(() => {});
+                StartupTrace.mark('tutorial-vs-visible');
+                console.info(`[Battle] tutorial VS visible (${Math.round(this.clock() - this.metricsStartedAt)}ms), loading battle assets in parallel`);
+            }
             let gmPrefab: Prefab | null = null, pausePrefab: Prefab, handPrefab: Prefab, cardPrefab: Prefab, settlementPrefab: Prefab;
-            let roundSettlementPrefab: Prefab, vsPrefab: Prefab, arrowPrefab: Prefab;
+            let roundSettlementPrefab: Prefab, vsPrefab: Prefab | null, arrowPrefab: Prefab;
             let blueLine: SpriteFrame, redLine: SpriteFrame;
             let settlementData: sp.SkeletonData, victoryArt: SpriteFrame, failureArt: SpriteFrame;
             [this.tokenPrefab, this.unitPrefab, handPrefab, cardPrefab, settlementPrefab, roundSettlementPrefab, vsPrefab, arrowPrefab, blueLine, redLine,
@@ -267,7 +286,8 @@ export class MatchController extends Component {
                 resources.load(BUNDLES.battleUi, 'prefabs/BattleCard', Prefab, undefined, 'normal'),
                 resources.load(BUNDLES.battleUi, 'prefabs/BattleSettlement', Prefab, undefined, 'normal'),
                 resources.load(BUNDLES.battleUi, 'prefabs/RoundSettlement', Prefab, undefined, 'normal'),
-                resources.load(BUNDLES.battleUi, 'prefabs/VSView', Prefab, undefined, 'normal'),
+                tutorialBattle ? Promise.resolve(null) :
+                    resources.load(BUNDLES.battleUi, 'prefabs/VSView', Prefab, undefined, 'normal'),
                 resources.load(BUNDLES.battle, 'prefabs/ArrowProjectile', Prefab, undefined, 'normal'),
                 resources.load(BUNDLES.battleUi, 'textures/ui/blue_line/spriteFrame', SpriteFrame, undefined, 'normal'),
                 resources.load(BUNDLES.battleUi, 'textures/ui/red_line/spriteFrame', SpriteFrame, undefined, 'normal'),
@@ -333,8 +353,12 @@ export class MatchController extends Component {
                 const debugButton = hud.getChildByName('OpenHeroBattleGM');
                 if (debugButton) debugButton.active = false;
             }
-            const animation = await matchAnimation;
-            if (!tutorialBattle) {
+            let vsNode = earlyVsNode;
+            let vsPlayback = earlyVsPlayback;
+            if (tutorialBattle) {
+                if (!vsNode || !vsPlayback) throw new Error('Tutorial VS transition was not started');
+            } else {
+                const animation = await matchAnimation;
                 this.matching!.progress(1);
                 const searchWait = matchSearchWait(match.startedAt);
                 if (searchWait > 0) await new Promise<void>(resolve => this.scheduleOnce(resolve, searchWait));
@@ -342,13 +366,15 @@ export class MatchController extends Component {
                 this.matching!.lockOpponent();
                 await new Promise<void>(resolve => this.scheduleOnce(resolve, MATCH_TIMING.lock));
                 if (!isValid(this, true) || this.leaving) return;
+                if (!vsPrefab) throw new Error('Battle requires battle_ui_bundle/prefabs/VSView');
+                vsNode = instantiate(vsPrefab); this.setUILayer(vsNode); this.node.addChild(vsNode);
+                this.matchStage = 'vs';
+                const vs = vsNode.getComponent(VSView);
+                if (!vs) throw new Error('VSView requires VSView component');
+                vsPlayback = vs.play(match, avatars as SpriteFrame[], animation);
             }
-            const vsNode = instantiate(vsPrefab); this.setUILayer(vsNode); this.node.addChild(vsNode);
-            this.matchStage = 'vs';
-            const vs = vsNode.getComponent(VSView);
-            if (!vs) throw new Error('VSView requires VSView component');
             if (matchNode) matchNode.active = false;
-            await vs.play(match, avatars as SpriteFrame[], animation);
+            await vsPlayback;
             if (!isValid(this, true) || this.leaving) return;
             vsNode.destroy(); matchNode?.destroy(); this.matching = undefined;
             this.matchStage = 'battle'; this.hud.node.active = true; this.world.camera.enabled = true;
@@ -362,6 +388,10 @@ export class MatchController extends Component {
             }
             this.interactiveAt = this.clock();
             StartupTrace.mark('battle-interactive');
+            if (tutorialBattle) {
+                console.info(`[Battle] tutorial interactive (${Math.round(this.clock() - this.metricsStartedAt)}ms), starting silent content prewarm`);
+                RemoteContentPrewarm.start(app);
+            }
             // An explicit inspection surface for automated acceptance; it invokes the same gameplay paths.
             if (DEBUG) {
                 (globalThis as any).__runePrototype = {

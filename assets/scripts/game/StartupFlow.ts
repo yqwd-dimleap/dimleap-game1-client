@@ -2,12 +2,13 @@ export interface StartupProgress { progress: number; message: string }
 export interface StartupPorts {
     initialize(): Promise<void>;
     checkVersion(): Promise<void>;
+    preloadBootBundles(report: (state: StartupProgress) => void): Promise<void>;
     prepareSession(): Promise<void>;
     prepareTutorial(report: (state: StartupProgress) => void): Promise<void>;
     enterHome(report: (state: StartupProgress) => void): Promise<void>;
 }
 
-/** Startup gate: enter the lightweight main shell before its UI bundles finish loading. */
+/** Startup gate: preload local feature bundles, prepare the tutorial, then enter the first scene. */
 export class StartupFlow {
     private pending?: Promise<void>;
     private attempt = 0;
@@ -24,13 +25,17 @@ export class StartupFlow {
         this.pending = Promise.resolve().then(async () => {
             progress(0, '读取启动配置');
             await this.ports.initialize();
-            progress(0.12, '检查客户端版本');
+            progress(0.08, '检查客户端版本');
             await this.ports.checkVersion();
-            progress(0.24, '准备游戏会话');
+            progress(0.12, '预加载启动资源');
+            await this.ports.preloadBootBundles(state => {
+                progress(0.12 + 0.18 * state.progress, state.message);
+            });
+            progress(0.32, '准备游戏会话');
             await Promise.all([
                 this.ports.prepareSession(),
                 this.ports.prepareTutorial(state => {
-                    progress(0.24 + 0.26 * state.progress, state.message);
+                    progress(0.32 + 0.2 * state.progress, state.message);
                 }),
             ]);
             progress(0.55, '进入游戏');

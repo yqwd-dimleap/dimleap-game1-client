@@ -4,7 +4,6 @@ import { LoadingPanel } from './ui/loading/LoadingPanel';
 import { GameApp } from './game/GameApp';
 import { StartupTrace } from './core/StartupTrace';
 import { StartupFlow } from './game/StartupFlow';
-import { RemoteContentPrewarm } from './game/battle/tutorial/RemotePrewarm';
 import { ToastService } from './ui/common/ToastService';
 import { DEBUG } from 'cc/env';
 const { ccclass } = _decorator;
@@ -39,6 +38,7 @@ export class BootController extends Component {
                     await this.installGlobalUI();
                 },
                 checkVersion: () => app.checkVersion(),
+                preloadBootBundles: report => SceneFlow.instance.preloadBootBundles(report),
                 prepareSession: () => app.prepareSession(),
                 prepareTutorial: report => SceneFlow.instance.prepareTutorial(report),
                 enterHome: async report => {
@@ -46,7 +46,6 @@ export class BootController extends Component {
                         report({ progress: 0.05, message: '准备新手对局' });
                         await app.startTutorialBattle();
                         await SceneFlow.instance.enter('battle', report);
-                        RemoteContentPrewarm.start(app);
                         return;
                     }
                     await SceneFlow.instance.enter('home', report);

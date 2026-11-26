@@ -99,15 +99,12 @@ export class DeploymentController {
         if (this.state.mode === 'lab' && this.state.tokens.length >= RULES.labTokenLimit) {
             this.state.phase = 'result'; this.ports.label('status', '试验场已满，点击重置继续'); this.ports.refreshHud(); return;
         }
-        if (this.state.mode === 'battle' && !this.state.budget.available(this.state.turn).length) {
-            this.state.hand = [];
-            this.state.phase = 'cannot-turn';
-            this.ports.showCannotTurn(this.state.turn);
-            this.ports.refreshHud();
-            return;
-        }
         const available = this.availableCards();
         if (this.state.mode === 'battle' && this.state.turn === 1) {
+            if (!available.length) {
+                this.cannotTurn();
+                return;
+            }
             const plan = this.ports.botPlan(available);
             if (!this.state.budget.select(this.state.turn, plan.hero)) throw new Error('Invalid bot card');
             this.state.selected = plan.hero;
@@ -116,11 +113,22 @@ export class DeploymentController {
             this.ports.label('status', `敌方选卡：${HEROES[plan.hero].name} · 消耗 ${HEROES[plan.hero].cost} 点`);
             this.state.lastBotPlan = plan;
         } else {
-            this.state.hand = drawBattleHand(available);
+            const hand = drawBattleHand(available);
+            if (this.state.mode === 'battle' && !this.state.budget.canAffordAny(0, hand)) {
+                this.cannotTurn();
+                return;
+            }
+            this.state.hand = hand;
             this.ports.frame('overview'); this.state.phase = 'selecting';
             this.ports.label('status', this.state.turn === 0 ? '你的回合 · 请选择一张英雄卡' : '试验场红方 · 请选择英雄卡');
             this.ports.label('guide', this.state.mode === 'lab' ? '试验场不消耗行动值，可重复试投' : '选卡立即扣除行动点；后续回合可重复选择同一英雄');
         }
+        this.ports.refreshHud();
+    }
+    private cannotTurn(): void {
+        this.state.hand = [];
+        this.state.phase = 'cannot-turn';
+        this.ports.showCannotTurn(this.state.turn);
         this.ports.refreshHud();
     }
     availableCards(): HeroId[] {

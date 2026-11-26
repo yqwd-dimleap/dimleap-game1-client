@@ -84,6 +84,8 @@ export class BattleHUDView extends Component {
         }
     }
     showCannotTurn(team: Team): void {
+        // 行动点不足只提示玩家本人；红方仍按 cannot-turn 状态跳过并继续回合切换。
+        if (team !== 0) return;
         const request = ++this.sequenceRequest;
         this.introRunning = true;
         this.pendingTurn = undefined; this.turnKey = `${team}:cannot-turn`;

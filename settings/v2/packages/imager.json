@@ -1,0 +1,9 @@
+{
+  "__version__": "1.7.0",
+  "outDir": "/Users/zhangzhihao/Documents/MyProject1/build/imageCache",
+  "exts": "png,jpg",
+  "ignores": "",
+  "minSize": 0.2,
+  "maxSize": 10,
+  "isAutoStart": "1"
+}

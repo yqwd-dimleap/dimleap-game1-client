@@ -16,6 +16,8 @@ export class SceneFlow {
     static readonly instance = new SceneFlow();
     private busy = false;
     private active?: { route: Route; scope: ResourceScope };
+    private bootPreparation?: Promise<void>;
+    private bootBundlesReady = false;
     private homePreparation?: Promise<void>;
     private preparedHome?: { scene: SceneAsset; scope: ResourceScope };
     private tutorialPreparation?: Promise<void>;
@@ -23,6 +25,38 @@ export class SceneFlow {
     /** The route owns preload and runtime references until its scene is destroyed. */
     resourcesFor(route: Route): ResourceScope {
         return this.active?.route === route ? this.active.scope : GameApp.instance.res.createScope(`scene:${route}:direct`);
+    }
+    preloadBootBundles(report: (state: LoadingState) => void): Promise<void> {
+        if (this.bootBundlesReady) return Promise.resolve();
+        if (this.bootPreparation) return this.bootPreparation;
+        const task = (async () => {
+            const app = GameApp.instance;
+            await app.initialize();
+            const bundles = [BUNDLES.ui, BUNDLES.tutorial, BUNDLES.battleUi, BUNDLES.battle];
+            let ready = 0;
+            const started = Date.now();
+            report({ progress: 0, message: '预加载启动资源' });
+            console.info(`[Boot] preload begin (${bundles.length}): ${bundles.join(', ')}`);
+            await Promise.all(bundles.map(async name => {
+                const bundleStarted = Date.now();
+                try {
+                    const bundle = await app.res.bundle(name);
+                    ready++;
+                    const cost = Date.now() - bundleStarted;
+                    console.info(`[Boot] preload success: ${name} (${cost}ms, ${ready}/${bundles.length}) base=${bundle.base}`);
+                    report({ progress: ready / bundles.length, message: `预加载启动资源 ${name}` });
+                } catch (error) {
+                    console.error(`[Boot] preload failed: ${name}`, error);
+                    throw error;
+                }
+            }));
+            this.bootBundlesReady = true;
+            console.info(`[Boot] preload complete: ${bundles.join(', ')} (${Date.now() - started}ms)`);
+        })();
+        this.bootPreparation = task;
+        const clear = (): void => { if (this.bootPreparation === task) this.bootPreparation = undefined; };
+        void task.then(clear, clear);
+        return task;
     }
     prepareHome(): Promise<void> {
         if (this.preparedHome) return Promise.resolve();
@@ -61,10 +95,11 @@ export class SceneFlow {
         const task = (async () => {
             await app.initialize();
             const scope = app.res.createScope('prepare:tutorial');
+            const started = Date.now();
             try {
                 report({ progress: 0.05, message: '加载新手引导分包' });
                 await app.res.bundle(BUNDLES.tutorial);
-                report({ progress: 0.35, message: '解析新手引导资源' });
+                report({ progress: 0.25, message: '解析新手引导资源' });
                 const loads = [
                     scope.load(BUNDLES.tutorial, 'prefabs/guide/NewbieGuide', Prefab, undefined, 'critical'),
                     scope.load(BUNDLES.tutorial, 'prefabs/guide/MaskLayer', Prefab, undefined, 'critical'),
@@ -75,10 +110,12 @@ export class SceneFlow {
                 let loaded = 0;
                 await Promise.all(loads.map(load => load.then(() => {
                     loaded++;
-                    report({ progress: 0.35 + 0.65 * loaded / loads.length, message: '加载新手引导资源' });
+                    report({ progress: 0.25 + 0.75 * loaded / loads.length, message: '加载新手引导资源' });
                 })));
                 this.preparedTutorial = { scope };
+                console.info(`[Boot] tutorial resources ready (${Date.now() - started}ms)`);
             } catch (error) {
+                console.error('[Boot] tutorial resource preload failed', error);
                 scope.dispose();
                 throw error;
             }
@@ -116,7 +153,9 @@ export class SceneFlow {
             if (preparedTutorial) this.preparedTutorial = undefined;
             incoming = preparedHome?.scope ?? preparedTutorial?.scope ?? app.res.createScope(`scene:${route}`);
             const localBundles = route === 'battle'
-                ? [BUNDLES.ui, BUNDLES.battle, BUNDLES.heroes, ...(app.isTutorialBattle ? [BUNDLES.tutorial] : [])]
+                ? app.isTutorialBattle ?
+                    [BUNDLES.ui, BUNDLES.battle, BUNDLES.tutorial] :
+                    [BUNDLES.ui, BUNDLES.battle, BUNDLES.heroes]
                 : [BUNDLES.ui];
             let bundlesReady = 0;
             progress(0.03, '加载本地分包');

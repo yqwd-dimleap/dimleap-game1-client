@@ -8,9 +8,9 @@
     "ui_bundle": { "delivery": "subpackage", "priority": 6, "dependencies": [] },
     "settings_ui": { "delivery": "remote", "priority": 4, "dependencies": ["ui_bundle"] },
     "tutorial_bundle": { "delivery": "subpackage", "priority": 5, "dependencies": [] },
-    "heroes_bundle": { "delivery": "subpackage", "priority": 5, "dependencies": ["ui_bundle"] },
+    "heroes_bundle": { "delivery": "remote", "priority": 4, "dependencies": ["ui_bundle"] },
     "battle_bundle": { "delivery": "subpackage", "priority": 5, "dependencies": ["ui_bundle"] },
-    "battle_ui_bundle": { "delivery": "remote", "priority": 4, "dependencies": ["ui_bundle"] },
+    "battle_ui_bundle": { "delivery": "subpackage", "priority": 5, "dependencies": ["ui_bundle"] },
     "map_bundle": { "delivery": "remote", "priority": 4, "dependencies": [] },
     "combat_content": { "delivery": "remote", "priority": 4, "dependencies": ["ui_bundle"] },
     "season_content": { "delivery": "remote", "priority": 4, "dependencies": ["ui_bundle"] }

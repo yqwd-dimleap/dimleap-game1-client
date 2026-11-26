@@ -61,7 +61,10 @@
     }
   },
   "splash-setting": {
-    "totalTime": 0
+    "totalTime": 500,
+    "logo": {
+      "type": "none"
+    }
   },
   "hasSetSplash": true,
   "textureCompressConfig": {

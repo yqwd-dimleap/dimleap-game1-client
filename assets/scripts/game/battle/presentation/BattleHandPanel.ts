@@ -1,6 +1,6 @@
 import { _decorator, Component, instantiate, Prefab, ProgressBar, Sprite, Label, SpriteFrame } from 'cc';
 import { ViewNodes } from '../../../ui/binding/ViewNodes';
-import { HeroId, RULES } from '../../../model/config/PrototypeConfig';
+import { HEROES, HeroId, RULES } from '../../../model/config/PrototypeConfig';
 import { BattleCardFrames, BattleCardView } from './BattleCardView';
 @_decorator.ccclass('BattleHandPanel')
 export class BattleHandPanel extends Component {
@@ -30,7 +30,8 @@ export class BattleHandPanel extends Component {
         this.ui.at('cards_info/ActionPoint', ProgressBar).progress = points / RULES.actionPoints;
         this.cards.forEach((view, i) => {
             const id = this.hand[i]; view.node.active = !!id;
-            if (id) view.render(id, levels[id] ?? 1, this.icons[id] ?? null, selecting, this.frames);
+            if (id) view.render(id, levels[id] ?? 1, this.icons[id] ?? null,
+                selecting && HEROES[id].cost <= points, this.frames);
         });
     }
     dispose(): void { this.cards.forEach(card => card.dispose()); }
