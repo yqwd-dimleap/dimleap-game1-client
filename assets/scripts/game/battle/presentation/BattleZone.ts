@@ -21,6 +21,7 @@ export class BattleZone extends Component {
     private highlightOpacity = 0;
     private highlightTarget = 0;
     private highlightClock = 0;
+    private pulseActive = false;
     get highlighted(): boolean { return this.highlightTarget > 0; }
 
     setHighlightEffect(effect: EffectAsset): void {
@@ -32,6 +33,7 @@ export class BattleZone extends Component {
     /** Fills the whole authored buffer silhouette while a moving token centre is inside it. */
     trackHighlight(active: boolean, dt: number): void {
         const step = Math.max(0, Math.min(dt, .1));
+        active = active || this.pulseActive;
         this.highlightTarget = active ? 1 : 0;
         this.highlightClock += step;
         const rate = active ? 10 : 24;
@@ -50,6 +52,10 @@ export class BattleZone extends Component {
         this.highlightMaterial!.setProperty('glowColor', GLOW_COLOR);
         this.highlightMaterial!.setProperty('glowParams',
             new Vec4(this.highlightOpacity * pulse * .72, Math.max(2.4 / width, 2.4 / height), .34, 0));
+    }
+
+    setTutorialPulse(active: boolean): void {
+        this.pulseActive = active;
     }
 
     clearHighlight(): void {

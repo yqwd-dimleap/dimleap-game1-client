@@ -27,7 +27,7 @@ export class StartupFlow {
             await this.ports.checkVersion();
             progress(0.24, '准备游戏会话');
             await this.ports.prepareSession();
-            progress(0.55, '进入大厅');
+            progress(0.55, '进入游戏');
             await this.ports.enterHome(state => progress(0.55 + 0.45 * state.progress, state.message));
             progress(1, '加载完成');
         }).then(() => { active = false; this.pending = undefined; }, error => {

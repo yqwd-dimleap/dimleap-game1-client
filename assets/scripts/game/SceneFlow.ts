@@ -16,9 +16,41 @@ export class SceneFlow {
     static readonly instance = new SceneFlow();
     private busy = false;
     private active?: { route: Route; scope: ResourceScope };
+    private homePreparation?: Promise<void>;
+    private preparedHome?: { scene: SceneAsset; scope: ResourceScope };
     /** The route owns preload and runtime references until its scene is destroyed. */
     resourcesFor(route: Route): ResourceScope {
         return this.active?.route === route ? this.active.scope : GameApp.instance.res.createScope(`scene:${route}:direct`);
+    }
+    prepareHome(): Promise<void> {
+        if (this.preparedHome) return Promise.resolve();
+        if (this.homePreparation) return this.homePreparation;
+        const task = (async () => {
+            const app = GameApp.instance;
+            await app.initialize();
+            const scope = app.res.createScope('prepare:home');
+            try {
+                await app.res.bundle(BUNDLES.ui);
+                const bundle = assetManager.getBundle('main');
+                if (!bundle) throw new Error('主资源包尚未就绪');
+                const [scene] = await Promise.all([
+                    new Promise<SceneAsset>((resolve, reject) => bundle.loadScene('main',
+                        () => {}, (error, asset) => error ? reject(error) : resolve(asset))),
+                    scope.load(BUNDLES.ui, 'prefabs/main/MainShell', Prefab, undefined, 'background'),
+                    scope.load(BUNDLES.ui, 'prefabs/home/HomeView', Prefab, undefined, 'background'),
+                    scope.load(BUNDLES.ui, 'prefabs/common/ModalLayer', Prefab, undefined, 'background'),
+                ]);
+                scope.retain(scene);
+                this.preparedHome = { scene, scope };
+            } catch (error) {
+                scope.dispose();
+                throw error;
+            }
+        })();
+        this.homePreparation = task;
+        const clear = (): void => { if (this.homePreparation === task) this.homePreparation = undefined; };
+        void task.then(clear, clear);
+        return task;
     }
     async enter(route: Route, report: (state: LoadingState) => void): Promise<void> {
         if (this.busy) throw new Error('场景正在切换，请稍候');
@@ -31,35 +63,53 @@ export class SceneFlow {
             highest = Math.max(highest, Math.min(1, fraction)); report({ progress: highest, message });
         };
         try {
-            progress(0, '读取启动配置');
+            progress(0, '读取本地分包配置');
             const app = GameApp.instance; await app.initialize();
             const target = ROUTES[route];
-            incoming = app.res.createScope(`scene:${route}`);
-            progress(0.05, '加载场景资源');
+            if (route === 'home' && this.homePreparation) {
+                try { await this.homePreparation; }
+                catch (error) { console.warn('[SceneFlow] home preparation failed; using fallback', error); }
+            }
+            const preparedHome = route === 'home' ? this.preparedHome : undefined;
+            if (preparedHome) this.preparedHome = undefined;
+            incoming = preparedHome?.scope ?? app.res.createScope(`scene:${route}`);
+            const localBundles = route === 'battle'
+                ? [BUNDLES.ui, BUNDLES.battle, BUNDLES.heroes, ...(app.isTutorialBattle ? [BUNDLES.tutorial] : [])]
+                : [BUNDLES.ui];
+            let bundlesReady = 0;
+            progress(0.03, '加载本地分包');
+            await Promise.all(localBundles.map(bundle => app.res.bundle(bundle).then(() => {
+                bundlesReady++;
+                progress(0.03 + 0.15 * bundlesReady / localBundles.length, `加载本地分包 ${bundle}`);
+            })));
+            progress(0.18, '加载场景资源');
             if (route === 'battle') {
-                const paths = battleContentPaths([...app.heroes.snapshot().lineup.filter((id): id is NonNullable<typeof id> => !!id), ...STARTER_LINEUP]);
                 let loaded = 0;
                 if (!app.battleStart) throw new Error('缺少服务端对局信息，请重新开始战斗');
-                const selectedMap = battleMapById(app.battleStart.map.mapId);
+                const selectedMap = battleMapById(app.isTutorialBattle ? 'map_1_1' : app.battleStart.map.mapId);
+                const lineup = app.isTutorialBattle ? STARTER_LINEUP :
+                    app.heroes.snapshot().lineup.filter((id): id is NonNullable<typeof id> => !!id);
+                const paths = app.isTutorialBattle ? [] : battleContentPaths([...lineup, ...STARTER_LINEUP]);
                 await Promise.all([
                     ...paths.map(path => incoming!.load(BUNDLES.combatContent, path, sp.SkeletonData, undefined, 'critical').then(() => {
-                        loaded++; progress(0.05 + 0.1 * loaded / paths.length, '加载首战资源');
+                        loaded++; progress(0.18 + 0.1 * loaded / paths.length, '加载首战资源');
                     })),
-                    incoming.load(BUNDLES.map, selectedMap.path, Prefab, (finished, total) => {
-                        progress(0.05 + 0.05 * (total ? finished / total : 0), `预加载地图 ${selectedMap.name}`);
-                    }, 'critical').then(() => progress(0.10, '地图预加载完成')),
+                    incoming.load(selectedMap.bundle, selectedMap.path, Prefab, (finished, total) => {
+                        progress(0.18 + 0.14 * (total ? finished / total : 0), `预加载地图 ${selectedMap.name}`);
+                    }, 'critical').then(() => progress(0.32, '地图预加载完成')),
                 ]);
             }
             const bundle = target.bundle === 'main' ? assetManager.getBundle('main') : await app.res.bundle(target.bundle);
             if (!bundle) throw new Error('主资源包尚未就绪');
             for (let i = 0; i < target.prefabs.length; i++) {
                 await incoming.load(target.bundle, target.prefabs[i], Prefab, (finished, total) =>
-                    progress(0.15 + 0.2 * (i + (total ? finished / total : 0)) / target.prefabs.length, '加载英雄与部队'), 'critical');
+                    progress(0.32 + 0.2 * (i + (total ? finished / total : 0)) / target.prefabs.length, '加载英雄与部队'), 'critical');
             }
-            const scene = await new Promise<SceneAsset>((resolve, reject) => bundle.loadScene(target.scene,
-                (finished, total) => progress(0.35 + 0.64 * (total ? finished / total : 0), '加载场景依赖'),
+            progress(0.52, '加载战斗场景');
+            const scene = preparedHome?.scene ?? await new Promise<SceneAsset>((resolve, reject) => bundle.loadScene(target.scene,
+                (finished, total) => progress(0.52 + 0.47 * (total ? finished / total : 0), '加载场景依赖'),
                 (error, asset) => error ? reject(error) : resolve(asset)));
-            incoming.retain(scene);
+            if (!preparedHome) incoming.retain(scene);
             progress(1, '加载完成');
             this.active = { route, scope: incoming };
             // Clear the lock before the next scene starts, so its own navigation is immediately available.

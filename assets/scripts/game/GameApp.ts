@@ -19,6 +19,7 @@ import { assertCompatibleVersion, CLIENT_VERSION } from '../model/config/BuildIn
 import { SeasonStore } from '../model/season/SeasonStore';
 import { PlayerProfile, validatePlayerProfile } from '../model/player/PlayerProfile';
 import { HERO_IDS, HeroId } from '../model/config/PrototypeConfig';
+import { TutorialStateStore } from '../core/TutorialState';
 import { DEBUG } from 'cc/env';
 
 export interface AppEvents {
@@ -49,6 +50,7 @@ export class GameApp {
     readonly platform = createPlatform();
     readonly events = new EventBus<AppEvents>();
     readonly save = new Save(sys.localStorage);
+    readonly tutorial = new TutorialStateStore(sys.localStorage);
     readonly heroes = new HeroProgressStore();
     readonly seasons = new SeasonStore();
     player: PlayerSave = { schema: 1, sound: true, matches: 0 };
@@ -62,6 +64,7 @@ export class GameApp {
     private claimedMilestoneIds: string[] = [];
     private currentSeasonId = '';
     private sessionReady = false;
+    private tutorialBattle = false;
     private pending?: Promise<void>;
     private initialized = false;
 
@@ -138,8 +141,13 @@ export class GameApp {
                         player: this.player,
                         heroes: this.heroes.snapshot(),
                         battle: this.battleStart,
+                        tutorial: {
+                            completed: !this.tutorial.needsTutorial(),
+                            battle: this.tutorialBattle,
+                        },
                         configVersion: this.configVersion,
                     }),
+                    resetTutorial: () => this.tutorial.reset(),
                 };
                 this.installDebugBridge();
             }
@@ -193,7 +201,21 @@ export class GameApp {
         }
     }
 
+    get isTutorialBattle(): boolean { return this.tutorialBattle; }
+
+    async startTutorialBattle(): Promise<CloudBattleStart> {
+        this.tutorialBattle = true;
+        const battle = await this.startBattle();
+        this.battleStart = { ...battle, map: { ...battle.map, mapId: 'map_1_1' } };
+        return this.battleStart;
+    }
+
+    completeTutorial(): boolean {
+        return this.tutorial.complete();
+    }
+
     abandonBattle(): void {
+        this.tutorialBattle = false;
         this.battleStart = undefined;
         this.battleMatch = undefined;
         this.syncDebugState();
@@ -366,5 +388,20 @@ export class GameApp {
         bind('rune-debug-finish-loss', () => { void this.finishMatch(1); });
         bind('rune-debug-refresh-cloud', () => { void this.refreshBootstrap(); });
         bind('rune-debug-claim-merit-1', () => { void this.seasons.claimMilestone(1); });
+        bind('rune-debug-tutorial-select', () => {
+            (globalThis as any).__runePrototype?.select('swordsman');
+        });
+        bind('rune-debug-tutorial-shoot', () => {
+            (globalThis as any).__runePrototype?.shoot(0, 90);
+        });
+        bind('rune-debug-tutorial-win', () => {
+            (globalThis as any).__runePrototype?.forceWin(0);
+        });
+        bind('rune-debug-return-home', () => {
+            (globalThis as any).__runePrototype?.returnHome();
+        });
+        bind('rune-debug-tutorial-reset', () => {
+            this.tutorial.reset();
+        });
     }
 }

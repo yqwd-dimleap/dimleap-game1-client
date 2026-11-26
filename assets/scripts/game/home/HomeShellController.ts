@@ -31,6 +31,8 @@ export class HomeShellController extends Component {
             const view = instantiate(prefab); this.node.addChild(view);
             this.shell = view.getComponent(MainShellView) ?? undefined;
             if (!this.shell) throw new Error('MainShell requires MainShellView');
+            const startupBackground = this.node.getChildByName('StartupBackground');
+            if (startupBackground) startupBackground.active = false;
             this.shell.initialize(page => { void this.select(page); });
             const modalNode = instantiate(modalPrefab); view.addChild(modalNode);
             const modals = modalNode.getComponent(ModalHost);

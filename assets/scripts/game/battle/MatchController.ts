@@ -33,18 +33,21 @@ import { SlingshotView } from './presentation/SlingshotView';
 import { GameApp } from '../GameApp';
 import { SceneFlow } from '../SceneFlow';
 import { loadPlayerAvatars } from '../../ui/common/PlayerUIAssets';
+import { HeroCardFrameIndex, loadHeroCardFrame } from '../../ui/heroes/HeroCardFrame';
 import { StartupTrace } from '../../core/StartupTrace';
 import { BattleTuningStore, currentTuning } from '../../model/battle/BattleTuning';
 import { BattleGMPanel } from './presentation/BattleGMPanel';
 import { DeploymentBudget } from '../../model/battle/DeploymentBudget';
 import { STARTER_LINEUP } from '../../model/hero/HeroProgress';
 import { BattleHandPanel } from './presentation/BattleHandPanel';
+import type { BattleCardFrames } from './presentation/BattleCardView';
 import { BattleMapView } from './presentation/BattleMapView';
 import { TroopAssets } from './presentation/TroopAssets';
 import { TroopSpineView } from './presentation/TroopSpineView';
 import { ArrowProjectiles } from './presentation/ArrowProjectiles';
 import { AimGuideView } from './presentation/AimGuideView';
 import { DeploymentEffects } from './presentation/DeploymentEffects';
+import { NewbieGuideView } from './tutorial/NewbieGuideView';
 import { DEBUG } from 'cc/env';
 import { GM_VISIBLE } from '../../core/Gm';
 const { ccclass } = _decorator;
@@ -64,10 +67,12 @@ export class MatchController extends Component {
         cancelInput: () => this.throwInput?.cancel(), blocked: () => this.paused || this.gmVisible,
         introReady: () => this.hud.introReady,
         launch: (token, shot) => {
+            this.tutorialGuide?.hideShootGuide();
             this.sling().release(); this.camera?.frame('flight'); token.node.setParent(this.tokenRoot, true); token.launch(shot.vx, shot.vy);
         },
         reinforce: point => this.deploymentFx?.reinforce(point), prepareTurn: () => this.prepareTurn(), snapshot: () => this.getSnapshot(),
         showCannotTurn: team => this.hud.showCannotTurn(team), hideCannotTurn: () => this.hud.hideCannotTurn(),
+        shotSettled: bonuses => { if (this.tutorialStage === 'shoot' && bonuses[0] > 0) this.finishTutorialGuide(); },
     });
     private static tuningStore?: BattleTuningStore;
     private resources?: ResourceScope;
@@ -101,6 +106,7 @@ export class MatchController extends Component {
     private effects: Effect[] = [];
 
     private enemyAI?: Readonly<AIRow>;
+    private battleDifficulty?: Readonly<AIRow>;
     private levels: Partial<Record<HeroId, number>> = {};
     private hand?: BattleHandPanel;
 
@@ -134,10 +140,13 @@ export class MatchController extends Component {
     private avatars: readonly SpriteFrame[] = [];
     private roundSettlement?: RoundSettlementView;
     private roundPresentationSerial = 0;
+    private seriesFinalized = false;
     private battlePause?: BattlePauseView;
     private matchStage = 'matching';
+    private tutorialGuide?: NewbieGuideView;
+    private tutorialStage: 'none' | 'welcome' | 'select' | 'shoot-prompt' | 'shoot' | 'done' = 'none';
     private readonly beginNextRound = (): void => {
-        if (!this.loaded || this.leaving || this.session.phase !== 'result') return;
+        if (!this.loaded || this.leaving || this.seriesFinalized || this.session.phase !== 'result') return;
         this.hand!.node.active = true;
         this.reset('battle', true);
     };
@@ -183,16 +192,32 @@ export class MatchController extends Component {
             const app = GameApp.instance;
             await app.initialize();
             if (!isValid(this, true) || this.leaving) return;
+            const tutorialBattle = app.isTutorialBattle;
+            this.matchStage = tutorialBattle ? 'vs' : 'matching';
             const resources = this.resources = SceneFlow.instance.resourcesFor('battle');
+            await this.loadTutorialGuide(resources);
+            if (!isValid(this, true) || this.leaving) return;
+            if (tutorialBattle) {
+                this.tutorialStage = 'welcome';
+            }
             await app.prepareSession();
             const cloudBattle = app.battleStart;
             if (!cloudBattle) throw new Error('缺少服务端对局信息，请返回大厅重新匹配');
+            const difficulty = cloudBattle.difficulty;
+            if (!difficulty) throw new Error('服务端对局难度缺失');
+            this.battleDifficulty = Object.freeze({
+                name: difficulty.name,
+                enemy_hero_level: difficulty.enemyHeroLevel,
+                aim_error_deg: difficulty.aimErrorDeg,
+                power_error_ratio: difficulty.powerErrorRatio,
+                bonus_zone_weight: difficulty.bonusZoneWeight,
+                displace_enemy_weight: difficulty.displaceEnemyWeight,
+            });
             const match = app.battleMatch ?? (app.battleMatch = createBattleMatch(Math.random, Date.now(), app.profile));
-            const mapDefinition = battleMapById(cloudBattle.map.mapId);
-            const [matchPrefab, avatars, mapPrefab, highlightEffect] = await Promise.all([
-                resources.load(BUNDLES.battleUi, 'prefabs/MatchView', Prefab, undefined, 'critical'),
-                loadPlayerAvatars(resources, 'critical'),
-                resources.load(BUNDLES.map, mapDefinition.path, Prefab, undefined, 'critical'),
+            if (tutorialBattle) match.red = { nickname: '新手训练师', avatar: 1 };
+            const mapDefinition = battleMapById(tutorialBattle ? 'map_1_1' : cloudBattle.map.mapId);
+            const [mapPrefab, highlightEffect] = await Promise.all([
+                resources.load(mapDefinition.bundle, mapDefinition.path, Prefab, undefined, 'critical'),
                 resources.load(BUNDLES.battle, 'materials/buffer-highlight', EffectAsset, undefined, 'normal'),
             ]);
             if (!isValid(this, true) || this.leaving) return;
@@ -208,13 +233,28 @@ export class MatchController extends Component {
             this.session.zones = this.mapView.layout(this.board);
             this.session.obstacles = this.mapView.obstacles;
             this.initialMapReady = true;
-            const matchNode = instantiate(matchPrefab as Prefab); this.setUILayer(matchNode); this.node.addChild(matchNode);
-            this.matching = matchNode.getComponent(MatchView)!;
-            this.match = match; this.avatars = avatars as SpriteFrame[];
-            this.matching.initialize(match, this.avatars as SpriteFrame[], () => { void this.returnHome(); });
-            // Defer battle input until both real assets and the transition animation are ready.
+            // Keep the tutorial map visible while the remaining battle assets load and
+            // VS plays, so the transition never falls back to the canvas clear color.
+            if (tutorialBattle) {
+                this.camera?.frame('overview', 0);
+                this.world.camera.enabled = true;
+            }
             const matchAnimation = resources.load(BUNDLES.battleUi, MATCH_SPINE_PATH, sp.SkeletonData, undefined, 'normal');
-            void matchAnimation.then(data => { if (isValid(this.matching, true)) this.matching!.animate(data); }).catch(() => {});
+            const [matchPrefab, avatars] = await Promise.all([
+                tutorialBattle ? Promise.resolve(null) :
+                    resources.load(BUNDLES.battleUi, 'prefabs/MatchView', Prefab, undefined, 'critical'),
+                loadPlayerAvatars(resources, 'critical'),
+            ]);
+            if (!isValid(this, true) || this.leaving) return;
+            this.match = match; this.avatars = avatars as SpriteFrame[];
+            let matchNode: Node | null = null;
+            if (matchPrefab) {
+                matchNode = instantiate(matchPrefab); this.setUILayer(matchNode); this.node.addChild(matchNode);
+                this.matching = matchNode.getComponent(MatchView)!;
+                this.matching.initialize(match, this.avatars as SpriteFrame[], () => { void this.returnHome(); });
+                // Defer battle input until both real assets and the transition animation are ready.
+                void matchAnimation.then(data => { if (isValid(this.matching, true)) this.matching!.animate(data); }).catch(() => {});
+            }
             let gmPrefab: Prefab | null = null, pausePrefab: Prefab, handPrefab: Prefab, cardPrefab: Prefab, settlementPrefab: Prefab;
             let roundSettlementPrefab: Prefab, vsPrefab: Prefab, arrowPrefab: Prefab;
             let blueLine: SpriteFrame, redLine: SpriteFrame;
@@ -239,12 +279,17 @@ export class MatchController extends Component {
             ]);
             if (!isValid(this, true) || this.leaving) return;
             this.aimGuide = new AimGuideView(this.world.aim, blueLine, redLine);
-            const heroIds = Array.from(new Set<HeroId>([...app.heroes.snapshot().lineup.filter((id): id is HeroId => !!id), ...STARTER_LINEUP]));
+            const lineup = tutorialBattle ? STARTER_LINEUP :
+                app.heroes.snapshot().lineup.filter((id): id is HeroId => !!id);
+            const heroIds = Array.from(new Set<HeroId>([...lineup, ...STARTER_LINEUP]));
             const icons: Partial<Record<HeroId, SpriteFrame>> = {};
             await Promise.all([this.troopAssets.load(resources, heroIds), ...heroIds.map(async id => {
                 if (HERO_ICON_PATHS[id]) icons[id] = await resources.load(BUNDLES.heroes, HERO_ICON_PATHS[id]!, SpriteFrame, undefined, 'normal');
             })]);
+            const frameIndices: readonly HeroCardFrameIndex[] = [1, 2, 3];
+            const loadedFrames = await Promise.all(frameIndices.map(frame => loadHeroCardFrame(resources, frame)));
             if (!isValid(this, true) || this.leaving) return;
+            const cardFrames: BattleCardFrames = { 1: loadedFrames[0], 2: loadedFrames[1], 3: loadedFrames[2] };
             this.world.slingshot(0).bind(this.troopAssets.launchers[0]);
             this.world.slingshot(1).bind(this.troopAssets.launchers[1]);
             this.arrows = new ArrowProjectiles(this.world.effects, arrowPrefab, this.troopAssets);
@@ -254,7 +299,7 @@ export class MatchController extends Component {
             const handRoot = instantiate(handPrefab); this.setUILayer(handRoot); hud.addChild(handRoot);
             this.hand = handRoot.getComponent(BattleHandPanel) ?? undefined;
             if (!this.hand) throw new Error('BattleHand requires BattleHandPanel');
-            this.hand.initialize(hero => this.selectHero(hero), cardPrefab, icons);
+            this.hand.initialize(hero => this.selectHero(hero), cardPrefab, icons, cardFrames);
             const roundSettlementRoot = instantiate(roundSettlementPrefab);
             this.setUILayer(roundSettlementRoot); hud.addChild(roundSettlementRoot);
             this.roundSettlement = roundSettlementRoot.getComponent(RoundSettlementView) ?? roundSettlementRoot.addComponent(RoundSettlementView);
@@ -289,23 +334,32 @@ export class MatchController extends Component {
                 if (debugButton) debugButton.active = false;
             }
             const animation = await matchAnimation;
-            this.matching.progress(1);
-            const searchWait = matchSearchWait(match.startedAt);
-            if (searchWait > 0) await new Promise<void>(resolve => this.scheduleOnce(resolve, searchWait));
-            if (!isValid(this, true) || this.leaving) return;
-            this.matching.lockOpponent();
-            await new Promise<void>(resolve => this.scheduleOnce(resolve, MATCH_TIMING.lock));
-            if (!isValid(this, true) || this.leaving) return;
+            if (!tutorialBattle) {
+                this.matching!.progress(1);
+                const searchWait = matchSearchWait(match.startedAt);
+                if (searchWait > 0) await new Promise<void>(resolve => this.scheduleOnce(resolve, searchWait));
+                if (!isValid(this, true) || this.leaving) return;
+                this.matching!.lockOpponent();
+                await new Promise<void>(resolve => this.scheduleOnce(resolve, MATCH_TIMING.lock));
+                if (!isValid(this, true) || this.leaving) return;
+            }
             const vsNode = instantiate(vsPrefab); this.setUILayer(vsNode); this.node.addChild(vsNode);
             this.matchStage = 'vs';
             const vs = vsNode.getComponent(VSView);
             if (!vs) throw new Error('VSView requires VSView component');
-            matchNode.active = false;
+            if (matchNode) matchNode.active = false;
             await vs.play(match, avatars as SpriteFrame[], animation);
             if (!isValid(this, true) || this.leaving) return;
-            vsNode.destroy(); matchNode.destroy(); this.matching = undefined;
+            vsNode.destroy(); matchNode?.destroy(); this.matching = undefined;
             this.matchStage = 'battle'; this.hud.node.active = true; this.world.camera.enabled = true;
-            this.loaded = true; this.reset('battle');
+            this.loaded = true;
+            this.series.setWinsRequired(2);
+            this.reset('battle');
+            if (tutorialBattle) {
+                this.hud.hideRoundTurn();
+                if (this.tutorialStage === 'welcome') this.tutorialGuide?.showWelcome();
+                else if (this.tutorialStage === 'select') this.tutorialGuide?.showSelectHero();
+            }
             this.interactiveAt = this.clock();
             StartupTrace.mark('battle-interactive');
             // An explicit inspection surface for automated acceptance; it invokes the same gameplay paths.
@@ -315,6 +369,8 @@ export class MatchController extends Component {
                     aim: (dx: number, dy: number) => this.aim(dx, dy), clearAim: () => this.clearAim(),
                     shoot: (dx: number, dy: number) => this.release(dx, dy),
                     select: (hero: HeroId) => this.selectHero(hero),
+                    forceWin: (team: Team) => this.forceRoundWinner(team),
+                    returnHome: () => { void this.returnHome(); },
                 };
                 console.info('[Battle] ready: Box2D, 750×1334', JSON.stringify(this.getMetrics()));
             }
@@ -327,6 +383,54 @@ export class MatchController extends Component {
         }
     }
 
+    private async loadTutorialGuide(resources: ResourceScope): Promise<void> {
+        const app = GameApp.instance;
+        if (!app.isTutorialBattle || this.tutorialGuide) return;
+        const [guidePrefab, maskPrefab, fingerGuidePrefab, fingerData] = await Promise.all([
+            resources.load(BUNDLES.tutorial, 'prefabs/guide/NewbieGuide', Prefab, undefined, 'critical'),
+            resources.load(BUNDLES.tutorial, 'prefabs/guide/MaskLayer', Prefab, undefined, 'critical'),
+            resources.load(BUNDLES.tutorial, 'prefabs/guide/FingerGuide', Prefab, undefined, 'critical'),
+            resources.load(BUNDLES.tutorial, 'animations/finger/nu_lanaaa', sp.SkeletonData, undefined, 'critical'),
+        ]);
+        if (!isValid(this, true) || this.leaving) return;
+        const mask = instantiate(maskPrefab);
+        this.setUILayer(mask);
+        this.node.addChild(mask);
+        const selectionGuide = instantiate(fingerGuidePrefab);
+        this.setUILayer(selectionGuide);
+        this.node.addChild(selectionGuide);
+        const guide = instantiate(guidePrefab);
+        this.setUILayer(guide);
+        this.node.addChild(guide);
+        const view = guide.addComponent(NewbieGuideView);
+        view.initialize(mask, selectionGuide, fingerData, () => {
+            if (this.tutorialStage !== 'welcome' || !isValid(this, true)) return;
+            this.tutorialStage = 'select';
+            this.tutorialGuide?.hideGuide();
+            if (this.loaded) this.tutorialGuide?.showSelectHero();
+        });
+        this.tutorialGuide = view;
+    }
+
+    private beginTutorialShoot(): void {
+        if (this.tutorialStage !== 'select' || !this.tutorialGuide) return;
+        this.tutorialStage = 'shoot-prompt';
+        this.tutorialGuide.hideSelectionGuide();
+        this.mapView?.setTutorialPulse(true);
+        this.scheduleOnce(() => this.mapView?.setTutorialPulse(false), 1);
+        this.tutorialGuide.showShootPrompt(() => {
+            if (this.tutorialStage !== 'shoot-prompt' || !isValid(this, true)) return;
+            this.tutorialStage = 'shoot';
+            this.tutorialGuide?.showShootGuide(this.sling().node.worldPosition);
+        });
+    }
+
+    private finishTutorialGuide(): void {
+        if (this.tutorialStage === 'done' || this.tutorialStage === 'none') return;
+        this.tutorialStage = 'done';
+        this.tutorialGuide?.hideGuide();
+    }
+
     private label(key: string, text: string): void {
         // Status/guide remain semantic state for diagnostics; the authored HUD owns presentation.
         if (key === 'status') this.hud.status(text);
@@ -336,7 +440,11 @@ export class MatchController extends Component {
         if (!this.loaded || this.leaving || mode !== 'battle') return;
         this.unschedule(this.beginNextRound);
         this.roundPresentationSerial++;
-        if (!preserveSeries) this.series.reset(Math.random() < .5 ? 0 : 1);
+        const tutorialBattle = GameApp.instance.isTutorialBattle;
+        if (!preserveSeries) {
+            this.series.reset(tutorialBattle ? 0 : Math.random() < .5 ? 0 : 1);
+            this.seriesFinalized = false;
+        }
         const startingTeam = this.series.startingTeam;
         this.revision++; this.throwInput?.cancel(); this.camera?.frame('overview', 0);
         for (const token of this.session.tokens) { token.body.enabled = false; token.getComponent(Collider2D)!.enabled = false; token.node.destroy(); }
@@ -351,18 +459,14 @@ export class MatchController extends Component {
         this.world.effectsGraphics.clear(); if (this.settlement) this.settlement.node.active = false;
         if (this.roundSettlement && isValid(this.roundSettlement, true)) this.roundSettlement.hide();
         const profile = GameApp.instance.heroes.snapshot();
-        const difficulty = GameApp.instance.battleStart?.difficulty;
-        if (!difficulty) throw new Error('服务端对局难度缺失');
-        this.enemyAI = Object.freeze({
-            name: difficulty.name,
-            enemy_hero_level: difficulty.enemyHeroLevel,
-            aim_error_deg: difficulty.aimErrorDeg,
-            power_error_ratio: difficulty.powerErrorRatio,
-            bonus_zone_weight: difficulty.bonusZoneWeight,
-            displace_enemy_weight: difficulty.displaceEnemyWeight,
-        });
-        this.levels = {}; for (const id of HERO_IDS) this.levels[id] = profile.heroes[id].level;
-        const lineup = profile.lineup;
+        if (!this.battleDifficulty) {
+            this.failRoundTransition(new Error('对局难度配置未初始化'));
+            return;
+        }
+        this.enemyAI = this.battleDifficulty;
+        this.levels = {};
+        for (const id of HERO_IDS) this.levels[id] = tutorialBattle ? 1 : profile.heroes[id].level;
+        const lineup = tutorialBattle ? STARTER_LINEUP : profile.lineup;
         this.session.budget = new DeploymentBudget(lineup, STARTER_LINEUP);
         this.session.mode = mode; this.session.turn = startingTeam; this.session.phase = 'overview'; this.session.timer = 0;
         this.session.quiet = 0; this.combatRunner.accumulator = 0; this.serial = 0; this.collisions = 0; this.wallHits = 0;
@@ -481,7 +585,11 @@ export class MatchController extends Component {
     private prepareTurn(): void { return this.deploymentFlow.prepareTurn(); }
 
     private availableCards(): HeroId[] { return this.deploymentFlow.availableCards(); }
-    private selectHero(hero: HeroId): void { return this.deploymentFlow.selectHero(hero); }
+    private selectHero(hero: HeroId): void {
+        const selecting = this.session.phase === 'selecting';
+        this.deploymentFlow.selectHero(hero);
+        if (selecting && this.session.phase === 'framing') this.beginTutorialShoot();
+    }
     private aim(dx: number, dy: number): void {
         if (!this.session.pending || (this.session.phase !== 'ready' && this.session.phase !== 'ai')) return;
         this.clearAim(false);
@@ -553,12 +661,16 @@ export class MatchController extends Component {
         if (this.paused || this.gmVisible) return;
         this.sampleFrame(rawDt);
         const dt = Math.min(rawDt, 0.1);
+        if (this.session.phase === 'result') {
+            this.drawEffects(dt);
+            return;
+        }
         this.deploymentFx?.step(dt);
         this.sling().stepRecoil?.(dt);
         this.camera?.update(dt);
         const deploying = this.deploymentFlow.update(dt);
         const deploymentHighlights = deploying && this.session.phase !== 'combat' &&
-            this.session.phase !== 'finishing' && this.session.phase !== 'result';
+            this.session.phase !== 'finishing';
         if (deploymentHighlights) this.mapView?.updateHighlights(this.session.tokens, dt);
         else this.mapView?.clearHighlights();
         if (!deploying && this.session.phase === 'combat') {
@@ -640,9 +752,12 @@ export class MatchController extends Component {
         const resolution = this.series.record(roundWinner);
         const summary = this.model?.summary() ?? { count: [0, 0], hp: [0, 0] };
         this.hud.turn(this.session.turn, false);
-        this.hud.setSeriesLives(livesBeforeRound(this.series.lives, roundWinner));
-        this.hud.hideRoundTurn();
-        this.syncVisualSpeed(true);
+        this.hud.setSeriesLives(livesBeforeRound(this.series.lives, roundWinner, this.series.maxLives));
+        this.hud.hideRoundTurn(true);
+        // Lock movable battle elements, but leave actor animation tracks untouched.
+        for (const token of this.session.tokens) token.setPlaybackScale(0);
+        this.arrows?.setSpeed(0);
+        this.deploymentFx?.setSpeed(0);
         this.label('status', '本局结束 · 即将进入局数结算');
         const presentation = ++this.roundPresentationSerial;
         this.scheduleOnce(() => {
@@ -664,30 +779,69 @@ export class MatchController extends Component {
         if (DEBUG) console.info('[Battle] round-settlement-open', JSON.stringify({
             round: resolution.round, winner: roundWinner, delay: ROUND_SETTLEMENT_DELAY,
         }));
-        void this.roundSettlement.play(roundWinner, match, this.avatars, this.series.lives)
-            .then(() => this.completeRoundPresentation(resolution, summary))
-            .catch(error => {
-                console.error('[Battle] RoundSettlement failed', error);
-                if (!isValid(this, true) || this.leaving) return;
-                this.roundSettlement?.hide();
-                this.completeRoundPresentation(resolution, summary);
-            });
+        void this.runRoundPresentation(roundWinner, resolution, summary);
+    }
+
+    private async runRoundPresentation(roundWinner: Team | 'draw',
+        resolution: ReturnType<BattleSeries['record']>,
+        summary: { count: number[]; hp: number[] }): Promise<void> {
+        try {
+            await this.roundSettlement!.play(roundWinner, this.match!, this.avatars, this.series.lives, this.series.maxLives);
+        } catch (error) {
+            console.error('[Battle] RoundSettlement failed', error);
+            if (!isValid(this, true) || this.leaving) return;
+            this.roundSettlement?.hide();
+        }
+        try {
+            await this.completeRoundPresentation(resolution, summary);
+        } catch (error) {
+            this.failRoundTransition(error);
+        }
+    }
+
+    private failRoundTransition(error: unknown): void {
+        console.error('[Battle] round transition failed', error);
+        if (!isValid(this, true) || this.leaving) return;
+        this.paused = true;
+        this.throwInput?.cancel();
+        PhysicsSystem2D.instance.enable = false;
+        this.syncVisualSpeed(true);
+        this.hud.status('对局数据异常，正在返回大厅');
+        this.scheduleOnce(() => {
+            if (isValid(this, true) && !this.leaving) void this.returnHome();
+        }, 1.2);
     }
 
     private async completeRoundPresentation(resolution: ReturnType<BattleSeries['record']>,
         summary: { count: number[]; hp: number[] }): Promise<void> {
         if (!isValid(this, true) || this.leaving || this.session.phase !== 'result') return;
+        if (this.seriesFinalized) return;
         if (!resolution.seriesComplete) {
             this.beginNextRound();
             return;
         }
+        this.seriesFinalized = true;
         const winner = resolution.seriesWinner!;
-        const reward = await GameApp.instance.finishMatch(winner);
+        const app = GameApp.instance;
+        const reward = await app.finishMatch(winner);
         if (!isValid(this, true) || this.leaving) return;
+        if (app.isTutorialBattle) {
+            app.completeTutorial();
+            this.tutorialStage = 'done';
+            this.tutorialGuide?.hideGuide();
+        }
         const detail = `系列赛 ${resolution.score[0]} : ${resolution.score[1]}\n剩余兵量 ${summary.count[0]} : ${summary.count[1]}\n${reward.ok
             ? `金币 +${reward.coins} · 星数 ${reward.starsDelta >= 0 ? '+' : ''}${reward.starsDelta} · 军功 +${reward.merit}`
             : reward.message}`;
-        this.settlement!.show(winner, detail, GameApp.instance.profile, this.resources!, () => { void this.returnHome(); });
+        this.settlement!.show(winner, detail, app.profile, this.resources!, () => { void this.returnHome(); });
+        void SceneFlow.instance.prepareHome().catch(error => {
+            console.warn('[Battle] home preload deferred:', error);
+        });
+        if (app.isTutorialBattle && winner === 0 && this.tutorialGuide) {
+            await this.tutorialGuide.showVictory();
+            if (!isValid(this, true) || this.leaving) return;
+            this.tutorialGuide.hideGuide();
+        }
         if (DEBUG) {
             console.info('[Battle] result', JSON.stringify(this.getSnapshot()));
             console.info('[Battle] metrics', JSON.stringify(this.getMetrics()));
@@ -768,6 +922,9 @@ export class MatchController extends Component {
         PhysicsSystem2D.instance.enable = false;
         this.hud.status('返回主界面…');
         try {
+            await SceneFlow.instance.prepareHome().catch(error => {
+                console.warn('[Battle] home preload failed; using scene loading fallback:', error);
+            });
             await SceneFlow.instance.enter('home', () => {});
             GameApp.instance.abandonBattle();
         }
@@ -800,6 +957,9 @@ export class MatchController extends Component {
         this.arrows?.clear();
         this.deploymentFx?.destroy();
         this.troopAssets.destroy();
+        const tutorialGuide = this.tutorialGuide;
+        this.tutorialGuide = undefined;
+        if (tutorialGuide && isValid(tutorialGuide, true)) tutorialGuide.dispose();
         this.resources?.dispose();
         if (this.hudCamera?.isValid) { this.hudCamera.clearFlags = this.hudClearFlags; this.hudCamera.visibility = this.hudVisibility; }
         [1, 2, 4].forEach((group, i) => {

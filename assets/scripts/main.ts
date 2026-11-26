@@ -4,6 +4,7 @@ import { LoadingPanel } from './ui/loading/LoadingPanel';
 import { GameApp } from './game/GameApp';
 import { StartupTrace } from './core/StartupTrace';
 import { StartupFlow } from './game/StartupFlow';
+import { RemoteContentPrewarm } from './game/battle/tutorial/RemotePrewarm';
 import { ToastService } from './ui/common/ToastService';
 import { DEBUG } from 'cc/env';
 const { ccclass } = _decorator;
@@ -39,7 +40,15 @@ export class BootController extends Component {
                 },
                 checkVersion: () => app.checkVersion(),
                 prepareSession: () => app.prepareSession(),
-                enterHome: report => SceneFlow.instance.enter('home', report),
+                enterHome: async report => {
+                    if (app.tutorial.needsTutorial()) {
+                        await app.startTutorialBattle();
+                        await SceneFlow.instance.enter('battle', report);
+                        RemoteContentPrewarm.start(app);
+                        return;
+                    }
+                    await SceneFlow.instance.enter('home', report);
+                },
             });
             // runScene destroys this component before the startup promise finishes.
             await this.flow.run(state => { if (this.isValid) this.loading.setProgress(state); });

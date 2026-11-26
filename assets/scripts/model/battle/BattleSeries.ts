@@ -16,18 +16,20 @@ export interface RoundResolution {
 export function livesBeforeRound(
     remaining: readonly [number, number],
     winner: RoundWinner,
+    maxLives = 2,
 ): readonly [number, number] {
     return [
-        Math.min(2, remaining[0] + (winner === 1 ? 1 : 0)),
-        Math.min(2, remaining[1] + (winner === 0 ? 1 : 0)),
+        Math.min(maxLives, remaining[0] + (winner === 1 ? 1 : 0)),
+        Math.min(maxLives, remaining[1] + (winner === 0 ? 1 : 0)),
     ];
 }
 
-/** Best-of-three series. A draw replays the same round and never consumes a decisive round. */
+/** Best-of-N series. A draw replays the same round and never consumes a decisive round. */
 export class BattleSeries {
     private round = 1;
     private wins: [number, number] = [0, 0];
     private firstTeam: Team = 0;
+    private winsRequired = 2;
 
     constructor(firstTeam?: Team) {
         this.firstTeam = firstTeam ?? (Math.random() < 0.5 ? 0 : 1);
@@ -36,9 +38,19 @@ export class BattleSeries {
     get currentRound(): number { return this.round; }
     get startingTeam(): Team { return (this.round % 2 === 1 ? this.firstTeam : (this.firstTeam === 0 ? 1 : 0)); }
     get score(): readonly [number, number] { return [this.wins[0], this.wins[1]]; }
-    get lives(): readonly [number, number] { return [2 - this.wins[1], 2 - this.wins[0]]; }
-    get complete(): boolean { return this.wins[0] >= 2 || this.wins[1] >= 2; }
-    get winner(): Team | null { return this.wins[0] >= 2 ? 0 : this.wins[1] >= 2 ? 1 : null; }
+    get maxLives(): number { return this.winsRequired; }
+    get lives(): readonly [number, number] {
+        return [this.winsRequired - this.wins[1], this.winsRequired - this.wins[0]];
+    }
+    get complete(): boolean { return this.wins[0] >= this.winsRequired || this.wins[1] >= this.winsRequired; }
+    get winner(): Team | null {
+        return this.wins[0] >= this.winsRequired ? 0 : this.wins[1] >= this.winsRequired ? 1 : null;
+    }
+
+    setWinsRequired(value: number): void {
+        if (!Number.isSafeInteger(value) || value < 1 || value > 3) throw new Error(`Invalid wins required: ${value}`);
+        this.winsRequired = value;
+    }
 
     reset(firstTeam: Team = Math.random() < 0.5 ? 0 : 1): void {
         this.round = 1;

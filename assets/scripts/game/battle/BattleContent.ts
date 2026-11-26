@@ -1,5 +1,6 @@
 import { DEPLOYABLE_HERO_IDS, HeroId } from '../../model/config/PrototypeConfig';
 import { rangedAttack } from '../../model/battle/CombatTiming';
+import { BUNDLES } from '../../core/Bundles';
 
 /** Resource keys only: importing this manifest does not import battle components. */
 export const BATTLE_TROOP_PATHS: Record<string, string> = {
@@ -44,34 +45,34 @@ export function setupCenter(header?: { x: number; y: number; width: number; heig
 /** VS spine ships with battle_ui_bundle and is authored on MatchView/VSView. */
 export const MATCH_SPINE_PATH = 'animations/pipei/UI_pipei_VS';
 export const SETTLEMENT_SPINE_PATH = 'animations/shengli_shibai/UI_shengli_shibai';
-export interface BattleMapDefinition { id: string; name: string; path: string }
-/** Authored maps live in map_bundle; the schematic PNGs are editor references only. */
+export interface BattleMapDefinition { id: string; name: string; bundle: string; path: string }
+/** The beginner map is local; the remaining authored maps stay in remote map_bundle. */
 export const BATTLE_MAPS: readonly BattleMapDefinition[] = [
-    { id: 'map_1_1', name: '地图一', path: 'prefabs/map_1_1' },
-    { id: 'map_1_2', name: '地图二', path: 'prefabs/map_1_2' },
-    { id: 'map_1_3', name: '地图三', path: 'prefabs/map_1_3' },
-    { id: 'map_1_4', name: '地图四', path: 'prefabs/map_1_4' },
-    { id: 'map_1_5', name: '地图五', path: 'prefabs/map_1_5' },
-    { id: 'map_2_1', name: '地图2-1', path: 'prefabs/map_2_1' },
-    { id: 'map_2_2', name: '地图2-2', path: 'prefabs/map_2_2' },
-    { id: 'map_2_3', name: '地图2-3', path: 'prefabs/map_2_3' },
-    { id: 'map_2_4', name: '地图2-4', path: 'prefabs/map_2_4' },
-    { id: 'map_2_5', name: '地图2-5', path: 'prefabs/map_2_5' },
-    { id: 'map_3_1', name: '地图3-1', path: 'prefabs/map_3_1' },
-    { id: 'map_3_2', name: '地图3-2', path: 'prefabs/map_3_2' },
-    { id: 'map_3_3', name: '地图3-3', path: 'prefabs/map_3_3' },
-    { id: 'map_3_4', name: '地图3-4', path: 'prefabs/map_3_4' },
-    { id: 'map_3_5', name: '地图3-5', path: 'prefabs/map_3_5' },
-    { id: 'map_4_1', name: '地图4-1', path: 'prefabs/map_4_1' },
-    { id: 'map_4_2', name: '地图4-2', path: 'prefabs/map_4_2' },
-    { id: 'map_4_3', name: '地图4-3', path: 'prefabs/map_4_3' },
-    { id: 'map_4_4', name: '地图4-4', path: 'prefabs/map_4_4' },
-    { id: 'map_4_5', name: '地图4-5', path: 'prefabs/map_4_5' },
-    { id: 'map_5_1', name: '地图5-1', path: 'prefabs/map_5_1' },
-    { id: 'map_5_2', name: '地图5-2', path: 'prefabs/map_5_2' },
-    { id: 'map_5_3', name: '地图5-3', path: 'prefabs/map_5_3' },
-    { id: 'map_5_4', name: '地图5-4', path: 'prefabs/map_5_4' },
-    { id: 'map_5_5', name: '地图5-5', path: 'prefabs/map_5_5' },
+    { id: 'map_1_1', name: '地图一', bundle: BUNDLES.tutorial, path: 'prefabs/map/map_1_1' },
+    { id: 'map_1_2', name: '地图二', bundle: BUNDLES.map, path: 'prefabs/map_1_2' },
+    { id: 'map_1_3', name: '地图三', bundle: BUNDLES.map, path: 'prefabs/map_1_3' },
+    { id: 'map_1_4', name: '地图四', bundle: BUNDLES.map, path: 'prefabs/map_1_4' },
+    { id: 'map_1_5', name: '地图五', bundle: BUNDLES.map, path: 'prefabs/map_1_5' },
+    { id: 'map_2_1', name: '地图2-1', bundle: BUNDLES.map, path: 'prefabs/map_2_1' },
+    { id: 'map_2_2', name: '地图2-2', bundle: BUNDLES.map, path: 'prefabs/map_2_2' },
+    { id: 'map_2_3', name: '地图2-3', bundle: BUNDLES.map, path: 'prefabs/map_2_3' },
+    { id: 'map_2_4', name: '地图2-4', bundle: BUNDLES.map, path: 'prefabs/map_2_4' },
+    { id: 'map_2_5', name: '地图2-5', bundle: BUNDLES.map, path: 'prefabs/map_2_5' },
+    { id: 'map_3_1', name: '地图3-1', bundle: BUNDLES.map, path: 'prefabs/map_3_1' },
+    { id: 'map_3_2', name: '地图3-2', bundle: BUNDLES.map, path: 'prefabs/map_3_2' },
+    { id: 'map_3_3', name: '地图3-3', bundle: BUNDLES.map, path: 'prefabs/map_3_3' },
+    { id: 'map_3_4', name: '地图3-4', bundle: BUNDLES.map, path: 'prefabs/map_3_4' },
+    { id: 'map_3_5', name: '地图3-5', bundle: BUNDLES.map, path: 'prefabs/map_3_5' },
+    { id: 'map_4_1', name: '地图4-1', bundle: BUNDLES.map, path: 'prefabs/map_4_1' },
+    { id: 'map_4_2', name: '地图4-2', bundle: BUNDLES.map, path: 'prefabs/map_4_2' },
+    { id: 'map_4_3', name: '地图4-3', bundle: BUNDLES.map, path: 'prefabs/map_4_3' },
+    { id: 'map_4_4', name: '地图4-4', bundle: BUNDLES.map, path: 'prefabs/map_4_4' },
+    { id: 'map_4_5', name: '地图4-5', bundle: BUNDLES.map, path: 'prefabs/map_4_5' },
+    { id: 'map_5_1', name: '地图5-1', bundle: BUNDLES.map, path: 'prefabs/map_5_1' },
+    { id: 'map_5_2', name: '地图5-2', bundle: BUNDLES.map, path: 'prefabs/map_5_2' },
+    { id: 'map_5_3', name: '地图5-3', bundle: BUNDLES.map, path: 'prefabs/map_5_3' },
+    { id: 'map_5_4', name: '地图5-4', bundle: BUNDLES.map, path: 'prefabs/map_5_4' },
+    { id: 'map_5_5', name: '地图5-5', bundle: BUNDLES.map, path: 'prefabs/map_5_5' },
 ];
 export function selectBattleMap(seed: number): BattleMapDefinition {
     const value = Number.isFinite(seed) ? Math.abs(Math.trunc(seed)) : 0;

@@ -30,7 +30,7 @@ export class RoundSettlementView extends Component {
     }
 
     async play(winner: RoundWinner, match: BattleMatch, avatars: readonly SpriteFrame[],
-        lives: readonly [number, number]): Promise<void> {
+        lives: readonly [number, number], maxLives = 2): Promise<void> {
         const request = ++this.playRequest;
         this.node.active = true;
         this.clearArrows();
@@ -47,7 +47,7 @@ export class RoundSettlementView extends Component {
 
         this.nodes.at('BluePlayer2', PlayerBadgeView).render(match.blue, avatars[match.blue.avatar - 1]);
         this.nodes.at('RedPlayer2', PlayerBadgeView).render(match.red, avatars[match.red.avatar - 1]);
-        this.prepareRoundIcons(livesBeforeRound(lives, winner), winner, 1);
+        this.prepareRoundIcons(livesBeforeRound(lives, winner, maxLives), winner, 1, maxLives);
 
         const background = this.nodes.at('background_ani', sp.Skeleton);
         background.node.active = true;
@@ -95,12 +95,13 @@ export class RoundSettlementView extends Component {
         this.ui = undefined;
     }
 
-    private prepareRoundIcons(lives: readonly [number, number], winner: RoundWinner, targetRound: number): void {
+    private prepareRoundIcons(lives: readonly [number, number], winner: RoundWinner, targetRound: number,
+        maxLives = 2): void {
         for (const [team, player, skin] of [[0, 'BluePlayer2', 'lan'], [1, 'RedPlayer2', 'hong']] as const) {
             for (const index of [1, 2]) {
                 const icon = this.nodes.at(`${player}/ani_round_${index}`, sp.Skeleton);
                 const target = winner !== 'draw' && winner !== team && index === targetRound;
-                icon.node.active = lives[team] >= index || target;
+                icon.node.active = index <= maxLives && (lives[team] >= index || target);
                 if (!icon.node.active) continue;
                 icon.setSkin(skin);
                 icon.setAnimation(0, 'idle', true);

@@ -16,6 +16,7 @@ import type { ModalPresenter } from '../../ui/common/ModalHost';
 import { PlayerSettingsController } from './PlayerSettingsController';
 import { MeritRewardController } from '../season/MeritRewardController';
 import { ToastService } from '../../ui/common/ToastService';
+import { RemoteContentPrewarm } from '../battle/tutorial/RemotePrewarm';
 const { ccclass } = _decorator;
 
 /** The current authored home page owns only its battle entry. BottomNav owns page navigation. */
@@ -97,7 +98,11 @@ export class HomeController extends UIBase {
         try {
             this.report?.('');
             const app = GameApp.instance, scope = this.matchResources = app.res.createScope('matching:home');
-            await app.startBattle();
+            if (app.tutorial.needsTutorial()) {
+                RemoteContentPrewarm.start(app);
+                await app.startTutorialBattle();
+            }
+            else await app.startBattle();
             const [prefab, avatars] = await Promise.all([
                 scope.load(BUNDLES.battleUi, 'prefabs/MatchView', Prefab),
                 loadPlayerAvatars(scope),

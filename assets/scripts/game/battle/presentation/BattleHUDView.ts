@@ -99,11 +99,12 @@ export class BattleHUDView extends Component {
             this.introRunning = false;
         }
     }
-    hideRoundTurn(): void {
+    hideRoundTurn(immediate = false): void {
         this.sequenceRequest++;
         this.introRunning = false;
         this.pendingTurn = undefined;
-        this.hideRoundTurnSpine();
+        if (immediate) this.stopSpine(this.roundTurnBanner);
+        else this.hideRoundTurnSpine();
     }
     status(text: string): void {
         const label = this.node.getChildByName('Status')?.getComponent(Label);

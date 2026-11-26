@@ -29,6 +29,7 @@ export interface DeploymentPorts {
     showCannotTurn(team: Team): void;
     hideCannotTurn(): void;
     introReady(): boolean;
+    shotSettled(bonuses: readonly [number, number]): void;
     snapshot(): object;
 }
 /** Per-base bonus settlement and whole-shot turn switching, independent of scene assembly. */
@@ -184,6 +185,7 @@ export class DeploymentController {
         const snapshot = this.state.tokens.filter(token => token.launched && token.enteredArena).map(token => token.snapshot());
         const bonuses = [0, 0]; for (const token of snapshot) bonuses[token.team] += bonusAt(token, this.state.zones);
         this.state.latestOutcome = `停稳：蓝方 +${bonuses[0]}，红方 +${bonuses[1]}`;
+        this.ports.shotSettled(bonuses as [number, number]);
         if (DEBUG) console.info('[Prototype] settled', JSON.stringify(this.ports.snapshot()));
         this.ports.label('guide', `${this.state.latestOutcome} · 每枚 Token 独立按中心点判区`);
         this.state.turn = this.state.turn === 0 ? 1 : 0;

@@ -20,6 +20,7 @@ export class BattleMapView extends Component {
     private solidObstacles: readonly CombatObstacle[] = [];
     private current: readonly Zone[] = [];
     private highlightEffect?: EffectAsset;
+    private tutorialPulseActive = false;
     private readonly litZones = new Set<string>();
     private readonly releaseDelays = new Map<string, number>();
     seed: number | null = null;
@@ -36,6 +37,7 @@ export class BattleMapView extends Component {
         this.litZones.clear();
         this.releaseDelays.clear();
         this.highlightEffect = highlightEffect;
+        this.tutorialPulseActive = false;
     }
 
     label(id: string, text: string): void {
@@ -89,7 +91,7 @@ export class BattleMapView extends Component {
         for (const zone of this.current) {
             const movingInside = movingCentres.some(point => zoneContains(point, zone));
             const stoppedInside = stoppedCentres.some(point => zoneContains(point, zone));
-            let active = movingInside;
+            let active = movingInside || this.tutorialPulseActive;
             if (movingInside) {
                 this.releaseDelays.delete(zone.id);
             } else if (stoppedInside && (previous.has(zone.id) || this.releaseDelays.has(zone.id))) {
@@ -110,6 +112,14 @@ export class BattleMapView extends Component {
             if (active) this.litZones.add(zone.id);
         }
         return this.highlightedZoneIds;
+    }
+
+    setTutorialPulse(active: boolean): void {
+        this.tutorialPulseActive = active;
+        for (const region of this.regions) {
+            region.setTutorialPulse(active);
+            if (active) this.litZones.add(region.id);
+        }
     }
 
     clearHighlights(): void {
