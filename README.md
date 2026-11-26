@@ -9,12 +9,14 @@ Cocos Creator 3.8.8 / TypeScript / 750×1334 / Box2D。
 | Bundle | 交付方式 | 优先级 | 依赖 | 职责 |
 | --- | --- | ---: | --- | --- |
 | 主包 | 本地主包 | - | - | 启动场景、轻量主场景、全部业务脚本、启动配置/表 |
-| `ui_bundle` | 本地分包 | 6 | - | 大厅壳、首页、导航、PlayerInfo、ModalLayer、玩家设置、共享按钮/头像/段位 |
+| `ui_bundle` | 本地分包 | 6 | - | 大厅壳、首页、导航、PlayerInfo、ModalLayer、共享按钮/头像/段位 |
+| `settings_ui` | 远程包 | 4 | `ui_bundle` | 玩家设置、头像设置和昵称修改 |
+| `tutorial_bundle` | 本地分包 | 5 | - | 新手引导 UI、手指 Spine、教学地图 `map_1_1` 独立资源 |
 | `heroes_bundle` | 本地分包 | 5 | `ui_bundle` | 英雄页 Prefab、英雄肖像与卡牌底图 |
 | `battle_bundle` | 本地分包 | 5 | `ui_bundle` | 战斗场景、战斗 Prefab、局部 UI、材质 |
 | `battle_ui_bundle` | 远程包 | 4 | `ui_bundle` | 匹配、VS、战斗手牌、暂停与结算 UI/Spine |
 | `combat_content` | 远程包 | 4 | `ui_bundle` | 英雄与兵种 Spine、VS/胜负大图和战斗特效 |
-| `map_bundle` | 远程包 | 4 | - | 25 张可战斗地图 Prefab 与地图内部资源 |
+| `map_bundle` | 远程包 | 4 | - | 24 张常规地图 Prefab 与地图内部资源 |
 | `season_content` | 远程包 | 4 | `ui_bundle` | 赛季页、排行榜、军功奖励与领奖动画 |
 
 Bundle 是资源加载边界，不是代码模块。业务脚本统一留在主包 `assets/scripts`，不得在远程包放 `.js`/`.ts`。所有跨包资源通过 `ResourceScope.load(bundle, path, type)` 加载，并由场景、页面或弹窗作用域释放；Prefab 的静态跨包引用必须写入 `assets/resources/config/app.json` 的依赖声明。
@@ -24,10 +26,14 @@ Bundle 名称集中定义在 `assets/scripts/core/Bundles.ts`。英雄与战斗�
 ## 性能边界
 
 - 微信主包预算 4 MiB，主包加本地分包预算 20 MiB；`npm run audit:wx` 和 `npm run audit:tt` 会在超出预算、远程包误入本地目录、启动预载异常时失败。
-- 启动只预载 `resources`、`main`。大厅壳先显示，英雄、设置、赛季、奖励和战斗资源按操作加载。
+- 启动只预载 `resources`、`main`。新玩家在 LoadingView 阶段按需加载 `tutorial_bundle` 及教学地图；老玩家不会加载新手资源。
+- 新手引导首屏显示后，只在后台预热 `battle_ui_bundle`、`combat_content` 的 Bundle 配置；不预下载完整远程地图包。
+- 设置页改为远程 Bundle，在大厅中按操作加载并显示加载状态。
+- 抖音构建将 WASM 资源与代码拆入平台子包，主包从接近 4 MiB 降至约 3.22 MiB。
 - 英雄页先显示已编排界面和卡片状态，头像、品质底图、详情/上阵弹窗在首帧后并行预热；不再让详情 Prefab 阻塞整个页面入口。
 - 军功奖励短按进入领取界面，长按进入奖励详情；未领取、已领取和锁定状态都支持长按。奖励表只展示编号大于 0 的最多 6 个物品；详情卡片保持 0.4 倍，并锚定在对应军功节点上方，领取界面为 1:1。
 - 战斗保留 Spine 按纹理/混合模式分页合批、对象池、虚拟列表和单位深度批量重排；移动平台维持 30 FPS，避免无收益的高频逻辑与发热。
+- 地图纹理使用 `Map Alpha` 预设，优先输出 ASTC 8x8，并保留 PNG 兜底；批量调整范围仅限地图图片和自动图集。
 - 正式包必须配置真实 AppID 和 HTTPS CDN。远程资源的下载、缓存、弱网和真机帧率仍需在微信开发者工具及 iOS/Android 真机复测。
 
 ## 常用命令

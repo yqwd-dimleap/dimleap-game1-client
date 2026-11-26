@@ -8,7 +8,7 @@
   "userData": {
     "isBundle": true,
     "bundleName": "settings_ui",
-    "priority": 5,
-    "bundleConfigID": "local-gameplay"
+    "priority": 4,
+    "bundleConfigID": "remote-content"
   }
 }

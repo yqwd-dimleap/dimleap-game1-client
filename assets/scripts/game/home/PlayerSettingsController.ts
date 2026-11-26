@@ -30,8 +30,10 @@ export class PlayerSettingsController {
         this.entries.set(page, entry);
         const close = (): void => { if (entry.node) this.modals.close(entry.node); };
         try {
+            this.report('正在加载设置页面…');
             const prefab = await entry.scope.load(BUNDLES.settings, `prefabs/settings/${page}`, Prefab);
             if (this.disposed || entry.closed || parent?.closed) { this.release(page, entry); return; }
+            this.report('');
             const node = entry.node = instantiate(prefab), profile = this.app.profile;
             if (page === 'SetUpView') {
                 const view = node.getComponent(SetUpView);

@@ -149,7 +149,6 @@ export class GameApp {
                     }),
                     resetTutorial: () => this.tutorial.reset(),
                 };
-                this.installDebugBridge();
             }
             StartupTrace.mark('tables-ready');
             StartupTrace.mark('config-ready');
@@ -365,43 +364,4 @@ export class GameApp {
         });
     }
 
-    private installDebugBridge(): void {
-        if (!DEBUG || typeof document === 'undefined') return;
-        if (!globalThis.location?.search.includes('cloudDebug=1')) return;
-        const bind = (id: string, action: () => void): void => {
-            let button = document.getElementById(id) as HTMLButtonElement | null;
-            if (!button) {
-                button = document.createElement('button');
-                button.id = id;
-                button.type = 'button';
-                button.textContent = id.replace('rune-debug-', '');
-                button.tabIndex = -1;
-                Object.assign(button.style, {
-                    position: 'fixed', left: '12px', top: `${64 + document.querySelectorAll('button[id^="rune-debug-"]').length * 30}px`,
-                    width: '130px', height: '24px', opacity: '0.92', zIndex: '2147483647',
-                });
-                document.body.appendChild(button);
-            }
-            button.onclick = action;
-        };
-        bind('rune-debug-finish-win', () => { void this.finishMatch(0); });
-        bind('rune-debug-finish-loss', () => { void this.finishMatch(1); });
-        bind('rune-debug-refresh-cloud', () => { void this.refreshBootstrap(); });
-        bind('rune-debug-claim-merit-1', () => { void this.seasons.claimMilestone(1); });
-        bind('rune-debug-tutorial-select', () => {
-            (globalThis as any).__runePrototype?.select('swordsman');
-        });
-        bind('rune-debug-tutorial-shoot', () => {
-            (globalThis as any).__runePrototype?.shoot(0, 90);
-        });
-        bind('rune-debug-tutorial-win', () => {
-            (globalThis as any).__runePrototype?.forceWin(0);
-        });
-        bind('rune-debug-return-home', () => {
-            (globalThis as any).__runePrototype?.returnHome();
-        });
-        bind('rune-debug-tutorial-reset', () => {
-            this.tutorial.reset();
-        });
-    }
 }

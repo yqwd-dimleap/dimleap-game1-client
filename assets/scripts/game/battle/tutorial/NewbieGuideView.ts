@@ -3,7 +3,7 @@ import { _decorator, BlockInputEvents, Button, Component, isValid, Label, Node, 
 const { ccclass } = _decorator;
 const DESIGN_WIDTH = 750;
 const DESIGN_HEIGHT = 1334;
-const TYPE_INTERVAL = 0.035;
+const TYPE_INTERVAL = 0.04;
 const PUNCTUATION_PAUSE = 0.12;
 
 @ccclass('NewbieGuideView')
@@ -69,7 +69,7 @@ export class NewbieGuideView extends Component {
         fingerTransform.setContentSize(201, 190.5);
         const skeleton = finger.addComponent(sp.Skeleton);
         skeleton.skeletonData = fingerData;
-        skeleton.setAnimationCacheMode(sp.Skeleton.AnimationCacheMode.REALTIME);
+        skeleton.setAnimationCacheMode(sp.Skeleton.AnimationCacheMode.PRIVATE_CACHE);
         finger.active = false;
         parent.addChild(finger);
         this.finger = finger;

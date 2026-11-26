@@ -40,8 +40,10 @@ export class BootController extends Component {
                 },
                 checkVersion: () => app.checkVersion(),
                 prepareSession: () => app.prepareSession(),
+                prepareTutorial: report => SceneFlow.instance.prepareTutorial(report),
                 enterHome: async report => {
                     if (app.tutorial.needsTutorial()) {
+                        report({ progress: 0.05, message: '准备新手对局' });
                         await app.startTutorialBattle();
                         await SceneFlow.instance.enter('battle', report);
                         RemoteContentPrewarm.start(app);
@@ -53,7 +55,10 @@ export class BootController extends Component {
             // runScene destroys this component before the startup promise finishes.
             await this.flow.run(state => { if (this.isValid) this.loading.setProgress(state); });
         }
-        catch (error) { if (this.isValid) this.loading.fail(error); }
+        catch (error) {
+            SceneFlow.instance.abandonPreparations();
+            if (this.isValid) this.loading.fail(error);
+        }
         finally { this.busy = false; }
     }
     private async installGlobalUI(): Promise<void> {

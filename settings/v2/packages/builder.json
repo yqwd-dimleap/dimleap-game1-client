@@ -65,7 +65,21 @@
   },
   "hasSetSplash": true,
   "textureCompressConfig": {
-    "userPreset": {},
+    "userPreset": {
+      "map-alpha": {
+        "name": "Map Alpha",
+        "options": {
+          "miniGame": {
+            "astc_8x8": {
+              "quality": "fast"
+            },
+            "png": {
+              "quality": 85
+            }
+          }
+        }
+      }
+    },
     "defaultConfig": {
       "default": {
         "name": "Default Opaque",

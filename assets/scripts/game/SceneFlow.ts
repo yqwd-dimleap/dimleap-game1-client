@@ -18,6 +18,8 @@ export class SceneFlow {
     private active?: { route: Route; scope: ResourceScope };
     private homePreparation?: Promise<void>;
     private preparedHome?: { scene: SceneAsset; scope: ResourceScope };
+    private tutorialPreparation?: Promise<void>;
+    private preparedTutorial?: { scope: ResourceScope };
     /** The route owns preload and runtime references until its scene is destroyed. */
     resourcesFor(route: Route): ResourceScope {
         return this.active?.route === route ? this.active.scope : GameApp.instance.res.createScope(`scene:${route}:direct`);
@@ -52,6 +54,45 @@ export class SceneFlow {
         void task.then(clear, clear);
         return task;
     }
+    prepareTutorial(report: (state: LoadingState) => void): Promise<void> {
+        const app = GameApp.instance;
+        if (!app.tutorial.needsTutorial()) return Promise.resolve();
+        if (this.preparedTutorial) return Promise.resolve();
+        if (this.tutorialPreparation) return this.tutorialPreparation;
+        const task = (async () => {
+            await app.initialize();
+            const scope = app.res.createScope('prepare:tutorial');
+            try {
+                report({ progress: 0.05, message: '加载新手引导分包' });
+                await app.res.bundle(BUNDLES.tutorial);
+                report({ progress: 0.35, message: '解析新手引导资源' });
+                const loads = [
+                    scope.load(BUNDLES.tutorial, 'prefabs/guide/NewbieGuide', Prefab, undefined, 'critical'),
+                    scope.load(BUNDLES.tutorial, 'prefabs/guide/MaskLayer', Prefab, undefined, 'critical'),
+                    scope.load(BUNDLES.tutorial, 'prefabs/guide/FingerGuide', Prefab, undefined, 'critical'),
+                    scope.load(BUNDLES.tutorial, 'animations/finger/nu_lanaaa', sp.SkeletonData, undefined, 'critical'),
+                    scope.load(BUNDLES.tutorial, 'prefabs/map/map_1_1', Prefab, undefined, 'critical'),
+                ];
+                let loaded = 0;
+                await Promise.all(loads.map(load => load.then(() => {
+                    loaded++;
+                    report({ progress: 0.35 + 0.65 * loaded / loads.length, message: '加载新手引导资源' });
+                })));
+                this.preparedTutorial = { scope };
+            } catch (error) {
+                scope.dispose();
+                throw error;
+            }
+        })();
+        this.tutorialPreparation = task;
+        const clear = (): void => { if (this.tutorialPreparation === task) this.tutorialPreparation = undefined; };
+        void task.then(clear, clear);
+        return task;
+    }
+    abandonPreparations(): void {
+        this.preparedTutorial?.scope.dispose();
+        this.preparedTutorial = undefined;
+    }
     async enter(route: Route, report: (state: LoadingState) => void): Promise<void> {
         if (this.busy) throw new Error('场景正在切换，请稍候');
         this.busy = true;
@@ -72,7 +113,9 @@ export class SceneFlow {
             }
             const preparedHome = route === 'home' ? this.preparedHome : undefined;
             if (preparedHome) this.preparedHome = undefined;
-            incoming = preparedHome?.scope ?? app.res.createScope(`scene:${route}`);
+            const preparedTutorial = route === 'battle' && app.isTutorialBattle ? this.preparedTutorial : undefined;
+            if (preparedTutorial) this.preparedTutorial = undefined;
+            incoming = preparedHome?.scope ?? preparedTutorial?.scope ?? app.res.createScope(`scene:${route}`);
             const localBundles = route === 'battle'
                 ? [BUNDLES.ui, BUNDLES.battle, BUNDLES.heroes, ...(app.isTutorialBattle ? [BUNDLES.tutorial] : [])]
                 : [BUNDLES.ui];

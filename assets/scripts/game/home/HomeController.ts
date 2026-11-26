@@ -55,6 +55,7 @@ export class HomeController extends UIBase {
         });
         await player.renderPlayer(app.profile, resources);
         if (!isValid(this, true)) return;
+        RemoteContentPrewarm.start(app);
         const legacyMiddle = this.node.getChildByName('MiddleNav');
         this.middle = legacyMiddle?.getComponent(MiddleNavView) ?? undefined;
         const battleNode = this.node.getChildByName('btn_battle') ?? legacyMiddle?.getChildByName('btn_battle');

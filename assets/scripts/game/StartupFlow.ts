@@ -3,6 +3,7 @@ export interface StartupPorts {
     initialize(): Promise<void>;
     checkVersion(): Promise<void>;
     prepareSession(): Promise<void>;
+    prepareTutorial(report: (state: StartupProgress) => void): Promise<void>;
     enterHome(report: (state: StartupProgress) => void): Promise<void>;
 }
 
@@ -26,7 +27,12 @@ export class StartupFlow {
             progress(0.12, '检查客户端版本');
             await this.ports.checkVersion();
             progress(0.24, '准备游戏会话');
-            await this.ports.prepareSession();
+            await Promise.all([
+                this.ports.prepareSession(),
+                this.ports.prepareTutorial(state => {
+                    progress(0.24 + 0.26 * state.progress, state.message);
+                }),
+            ]);
             progress(0.55, '进入游戏');
             await this.ports.enterHome(state => progress(0.55 + 0.45 * state.progress, state.message));
             progress(1, '加载完成');
