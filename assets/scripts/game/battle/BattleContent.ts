@@ -84,8 +84,8 @@ export function battleMapById(id: string): BattleMapDefinition {
     return found;
 }
 export const SETTLEMENT_ART_PATHS = {
-    victory: 'battle/results/shengli_icon/spriteFrame',
-    failure: 'battle/results/shibai_icon/spriteFrame',
+    victory: 'textures/ui/victory_icon/spriteFrame',
+    failure: 'textures/ui/fail_icon/spriteFrame',
 } as const;
 export function battleContentPaths(ids: readonly string[]): string[] {
     return Array.from(new Set([

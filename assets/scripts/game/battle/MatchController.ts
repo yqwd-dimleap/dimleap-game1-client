@@ -292,8 +292,8 @@ export class MatchController extends Component {
                 resources.load(BUNDLES.battleUi, 'textures/ui/blue_line/spriteFrame', SpriteFrame, undefined, 'normal'),
                 resources.load(BUNDLES.battleUi, 'textures/ui/red_line/spriteFrame', SpriteFrame, undefined, 'normal'),
                 resources.load(BUNDLES.battleUi, SETTLEMENT_SPINE_PATH, sp.SkeletonData, undefined, 'normal'),
-                resources.load(BUNDLES.combatContent, SETTLEMENT_ART_PATHS.victory, SpriteFrame, undefined, 'normal'),
-                resources.load(BUNDLES.combatContent, SETTLEMENT_ART_PATHS.failure, SpriteFrame, undefined, 'normal'),
+                resources.load(BUNDLES.battleUi, SETTLEMENT_ART_PATHS.victory, SpriteFrame, undefined, 'normal'),
+                resources.load(BUNDLES.battleUi, SETTLEMENT_ART_PATHS.failure, SpriteFrame, undefined, 'normal'),
                 GM_VISIBLE ? resources.load(BUNDLES.battleUi, 'prefabs/BattleGM', Prefab, undefined, 'background') : Promise.resolve(null),
                 resources.load(BUNDLES.battleUi, 'prefabs/BattlePause', Prefab, undefined, 'normal'),
             ]);
