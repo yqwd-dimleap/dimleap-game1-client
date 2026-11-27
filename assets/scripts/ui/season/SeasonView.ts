@@ -1,5 +1,5 @@
 import { ViewNodes } from '../binding/ViewNodes';
-import { Button, Label, Node, ScrollView, Sprite, SpriteFrame, isValid } from 'cc';
+import { Button, Label, Node, ScrollView, Sprite, SpriteFrame, UITransform, isValid, Vec3 } from 'cc';
 import type { SeasonRankEntry, SeasonState } from '../../model/season/SeasonState';
 import { RankLevelView } from './RankLevelView';
 import type { RankLevelAssets } from './RankLevelView';
@@ -7,15 +7,51 @@ import { rankAvatarId } from './RankItemView';
 
 /** Authored season surface over the controller-owned virtual ranking list. */
 export class SeasonView {
+    private static readonly MIN_SCROLL_HEIGHT = 640;
+    private static readonly SELF_RANK_GAP = 12;
     readonly scroll: ScrollView;
     private ui: ViewNodes;
     private seasonButton?: Button;
     private seasonClick?: () => void;
+    private scrollNode: Node;
+    private scrollTransform: UITransform;
+    private scrollMaskTransform: UITransform;
+    private selfRankTransform: UITransform;
     constructor(readonly node: Node) {
         this.ui = new ViewNodes(node);
-        const scroll = node.getChildByName('RankScroll')?.getComponent(ScrollView);
-        if (!scroll) throw new Error('SeasonView requires RankScroll');
+        const scrollNode = node.getChildByName('RankScroll');
+        const scroll = scrollNode?.getComponent(ScrollView);
+        const scrollTransform = scrollNode?.getComponent(UITransform);
+        const scrollMaskTransform = scrollNode?.getChildByName('View')?.getComponent(UITransform);
+        const selfRankTransform = node.getChildByName('bg_frame_2')?.getComponent(UITransform);
+        if (!scrollNode || !scroll || !scrollTransform || !scrollMaskTransform || !selfRankTransform)
+            throw new Error('SeasonView requires RankScroll, View and bg_frame_2');
+        this.scrollNode = scrollNode;
         this.scroll = scroll;
+        this.scrollTransform = scrollTransform;
+        this.scrollMaskTransform = scrollMaskTransform;
+        this.selfRankTransform = selfRankTransform;
+        this.layout();
+    }
+
+    /** Extend only the ranking viewport down to the authored 285-high self-rank card. */
+    layout(): void {
+        if (!isValid(this.node, true) || !isValid(this.scrollNode, true)) return;
+        const rootTransform = this.node.getComponent(UITransform);
+        if (!rootTransform) return;
+        const scrollBox = this.scrollTransform.getBoundingBoxToWorld();
+        const selfRankBox = this.selfRankTransform.getBoundingBoxToWorld();
+        const top = rootTransform.convertToNodeSpaceAR(
+            new Vec3(scrollBox.x + scrollBox.width * 0.5, scrollBox.y + scrollBox.height, 0));
+        const selfRankTop = rootTransform.convertToNodeSpaceAR(
+            new Vec3(selfRankBox.x + selfRankBox.width * 0.5, selfRankBox.y + selfRankBox.height, 0));
+        const height = Math.max(SeasonView.MIN_SCROLL_HEIGHT,
+            top.y - selfRankTop.y - SeasonView.SELF_RANK_GAP);
+        if (Math.abs(this.scrollTransform.height - height) < 0.5) return;
+
+        this.scrollTransform.setContentSize(this.scrollTransform.width, height);
+        this.scrollMaskTransform.setContentSize(this.scrollMaskTransform.width, height);
+        this.scrollNode.setPosition(this.scrollNode.position.x, top.y - height * 0.5, this.scrollNode.position.z);
     }
     bindSeasonRewards(open: () => void): void {
         const button = this.node.getChildByName('btn_season')?.getComponent(Button);

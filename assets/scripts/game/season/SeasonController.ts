@@ -1,4 +1,4 @@
-import { _decorator, Component, instantiate, isValid, Node, Prefab, SpriteFrame } from 'cc';
+import { _decorator, Component, instantiate, isValid, Node, Prefab, screen, SpriteFrame } from 'cc';
 import { ResourceScope } from '../../core/ResourceScope';
 import { BUNDLES } from '../../core/Bundles';
 import { SeasonView } from '../../ui/season/SeasonView';
@@ -27,6 +27,7 @@ export class SeasonController extends Component {
     private generation = 0;
     private disposed = false;
     private view!: SeasonView;
+    private readonly relayout = (): void => { this.view?.layout(); };
     private list?: VirtualList;
     private store!: SeasonStore;
     private stars = 0;
@@ -39,6 +40,20 @@ export class SeasonController extends Component {
     private rewardPopup?: Node;
     private rewardRequest = 0;
     private rewardIconLoad?: Promise<void>;
+
+    onEnable(): void {
+        screen.on('window-resize', this.onWindowResize, this);
+    }
+
+    onDisable(): void {
+        screen.off('window-resize', this.onWindowResize, this);
+        this.unschedule(this.relayout);
+    }
+
+    private onWindowResize(): void {
+        this.unschedule(this.relayout);
+        this.scheduleOnce(this.relayout);
+    }
 
     async initialize(resources: ResourceScope, store: SeasonStore, stars = 0, modals?: ModalPresenter): Promise<void> {
         const [row, avatars, top, other, self, badges, titleBackgrounds] = await Promise.all([
@@ -62,7 +77,10 @@ export class SeasonController extends Component {
         this.setEntries([]);
     }
 
-    show(): void { void this.refresh(); }
+    show(): void {
+        this.view?.layout();
+        void this.refresh();
+    }
     hide(): void {
         this.generation++; this.rewardRequest++;
         if (this.rewardPopup && isValid(this.rewardPopup, true)) this.modals?.close(this.rewardPopup);
