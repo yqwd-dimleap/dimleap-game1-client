@@ -50,6 +50,7 @@ export class HomeShellController extends Component {
                         setLayer(node); this.node.addChild(node);
                     };
                     controller.navigationBusy = busy => this.shell?.navigationBusy(busy);
+                    controller.waiting = visible => this.shell?.setWaiting(visible);
                     controller.report = message => this.shell?.status(message);
                     await controller.initialize(scope, modals);
                     return { destroy: () => controller.dispose() };
@@ -82,12 +83,20 @@ export class HomeShellController extends Component {
     private async select(page: MainPage): Promise<void> {
         const selection = ++this.selection;
         this.shell?.status('');
+        this.shell?.navigationBusy(true);
+        const waiting = (page === 'heroes' || page === 'season') && !this.router?.isLoaded(page);
+        if (waiting) this.shell?.setWaiting(true);
         try {
             const changed = await this.router?.show(page);
             if (!isValid(this, true) || selection !== this.selection) return;
             if (changed) { this.shell?.selected(page); this.shell?.status(''); }
         } catch (error) {
             if (isValid(this, true) && selection === this.selection) this.shell?.status(`页面加载失败，可再次点击重试：${String(error)}`);
+        } finally {
+            if (selection === this.selection) {
+                this.shell?.setWaiting(false);
+                this.shell?.navigationBusy(false);
+            }
         }
     }
     onDestroy(): void {

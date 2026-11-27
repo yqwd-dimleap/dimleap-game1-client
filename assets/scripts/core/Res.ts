@@ -65,6 +65,7 @@ export class Res {
         return { queue: this.queue.snapshot(), bundleRequests: this.pending.size, assetRequests,
             remoteVersion: this.versions.state };
     }
+    isBundleLoaded(name: string): boolean { return !!assetManager.getBundle(name); }
     async bundle(name: string): Promise<AssetManager.Bundle> {
         await this.versions.initialize();
         const cached = assetManager.getBundle(name);

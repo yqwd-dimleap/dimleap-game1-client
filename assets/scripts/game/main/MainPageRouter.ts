@@ -57,6 +57,7 @@ export class MainPageRouter {
         void request.result.then(clear, clear);
         return request.result;
     }
+    isLoaded(page: MainPage): boolean { return this.pages.has(page); }
     private activateShell(page: MainPage, node: Node): void {
         if (this.active && this.active !== page) this.pages.get(this.active)?.handle.hide?.();
         for (const [name, entry] of this.pages) entry.node.active = name === page;

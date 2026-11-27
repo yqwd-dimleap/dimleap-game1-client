@@ -36,6 +36,7 @@ export class HomeController extends UIBase {
     navigate?: (page: MainPage) => Promise<void>;
     mountOverlay?: (node: Node) => void;
     navigationBusy?: (busy: boolean) => void;
+    waiting?: (visible: boolean) => void;
     report?: (message: string) => void;
     async initialize(resources: ResourceScope, modals: ModalPresenter): Promise<void> {
         game.frameRate = 30; PhysicsSystem2D.instance.enable = false;
@@ -43,7 +44,8 @@ export class HomeController extends UIBase {
         if (!player) throw new Error('HomeView requires PlayerInfo/PlayerInfoView');
         const app = GameApp.instance;
         this.playerInfo = player;
-        this.settings = new PlayerSettingsController(app, modals, message => this.report?.(message));
+        this.settings = new PlayerSettingsController(app, modals, message => this.report?.(message),
+            visible => this.waiting?.(visible));
         this.rewards = new MeritRewardController(app, modals, message => this.report?.(message),
             () => this.refreshMiddleMerit());
         player.initialize(() => this.settings?.open());

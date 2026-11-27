@@ -69,7 +69,7 @@ export class BootController extends Component {
                 await new Promise<void>(resolve => director.once(Director.EVENT_AFTER_DRAW, resolve));
             }
             if (!this.isValid) return;
-            this.loading.setProgress({ progress: 1, message: '加载完成' });
+            await this.loading.finish('加载完成');
             this.loading.hide();
             this.node.destroy();
         }

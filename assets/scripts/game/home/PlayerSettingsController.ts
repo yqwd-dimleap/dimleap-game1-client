@@ -15,7 +15,8 @@ export class PlayerSettingsController {
     private entries = new Map<Page, Entry>();
     private disposed = false;
     private readonly profileOff: () => void;
-    constructor(private app: GameApp, private modals: ModalPresenter, private report: (message: string) => void) {
+    constructor(private app: GameApp, private modals: ModalPresenter, private report: (message: string) => void,
+        private waiting: (visible: boolean) => void = () => {}) {
         this.profileOff = app.events.on('profile:changed', profile => {
             const entry = this.entries.get('SetUpView'), view = entry?.node?.getComponent(SetUpView);
             if (entry && view) void view.renderPlayer(profile, entry.scope).catch(error => {
@@ -29,6 +30,8 @@ export class PlayerSettingsController {
         const entry: Entry = { scope: this.app.res.createScope(`player-settings:${page}`), closed: false };
         this.entries.set(page, entry);
         const close = (): void => { if (entry.node) this.modals.close(entry.node); };
+        const waiting = !this.app.res.isBundleLoaded(BUNDLES.settings);
+        if (waiting) this.waiting(true);
         try {
             this.report('正在加载设置页面…');
             const prefab = await entry.scope.load(BUNDLES.settings, `prefabs/settings/${page}`, Prefab);
@@ -65,6 +68,8 @@ export class PlayerSettingsController {
             const report = !this.disposed && !entry.closed && !parent?.closed;
             this.release(page, entry);
             if (report) this.report(`设置页面加载失败，可再次点击重试：${String(error)}`);
+        } finally {
+            if (waiting) this.waiting(false);
         }
     }
     private release(page: Page, entry: Entry): void {
