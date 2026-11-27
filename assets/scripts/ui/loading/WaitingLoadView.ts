@@ -18,7 +18,7 @@ export class WaitingLoadView extends Component {
 
     update(dt: number): void {
         this.resolveIcon();
-        if (this.icon) this.icon.angle = (this.icon.angle + dt * 360) % 360;
+        if (this.icon) this.icon.angle = (this.icon.angle - dt * 360) % 360;
     }
 
     private resolveIcon(): void {

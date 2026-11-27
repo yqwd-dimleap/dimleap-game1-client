@@ -161,14 +161,10 @@ export class HeroReplaceView extends Component {
     }
 
     private playDragArrow(): void {
-        this.dragArrow.setCompleteListener(this.onDragArrowComplete);
+        this.dragArrow.setCompleteListener(() => {});
         this.dragArrow.node.active = true;
-        this.dragArrow.setAnimation(0, 'animation', false);
+        this.dragArrow.setAnimation(0, 'animation', true);
     }
-
-    private readonly onDragArrowComplete = (): void => {
-        this.hideDragArrow();
-    };
 
     private hideDragArrow(): void {
         this.dragArrow.setCompleteListener(() => {});
