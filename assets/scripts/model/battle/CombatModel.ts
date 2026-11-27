@@ -87,7 +87,8 @@ export class CombatModel {
         if (options.units) this.units = options.units;
         for (const token of deployment) {
             const hero = heroStats(token.hero, token.level);
-            const count = deploymentTroopCount(token, this.config.zones);
+            const count = deploymentTroopCount(token, this.config.zones,
+                this.config.rules.tokenRadius, this.config.rules.zoneContactDepth);
             const enemies = this.units.filter(unit => unit.team !== token.team);
             for (let i = 0; i < count; i++) {
                 const angle = i * 2.399963229728653;

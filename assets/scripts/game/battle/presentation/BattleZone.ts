@@ -30,7 +30,7 @@ export class BattleZone extends Component {
         this.highlightEffect = effect;
     }
 
-    /** Fills the whole authored buffer silhouette while a moving token centre is inside it. */
+    /** Fills the whole authored buffer silhouette while a moving token touches it. */
     trackHighlight(active: boolean, dt: number): void {
         const step = Math.max(0, Math.min(dt, .1));
         active = active || this.pulseActive;

@@ -52,7 +52,11 @@ export class HomeController extends UIBase {
                 if (isValid(this, true)) this.report?.(`玩家信息加载失败：${String(error)}`);
             });
         });
-        await player.renderPlayer(app.profile, resources);
+        // Rank art lives in a remote bundle; render the shell immediately and fill
+        // the badge without blocking first-screen interactivity.
+        void player.renderPlayer(app.profile, resources).catch(error => {
+            if (isValid(this, true)) this.report?.(`玩家信息加载失败：${String(error)}`);
+        });
         if (!isValid(this, true)) return;
         const legacyMiddle = this.node.getChildByName('MiddleNav');
         this.middle = legacyMiddle?.getComponent(MiddleNavView) ?? undefined;
@@ -102,7 +106,7 @@ export class HomeController extends UIBase {
             }
             else await app.startBattle();
             const [prefab, avatars] = await Promise.all([
-                scope.load(BUNDLES.battleUi, 'prefabs/MatchView', Prefab),
+                scope.load(BUNDLES.battleRuntime, 'prefabs/MatchView', Prefab),
                 loadPlayerAvatars(scope),
             ]);
             if (!isValid(this, true)) return;
@@ -111,7 +115,7 @@ export class HomeController extends UIBase {
             if (!this.mountOverlay) throw new Error('Home overlay host missing');
             this.mountOverlay(this.matching);
             const view = this.matching.getComponent(MatchView)!; view.initialize(match, avatars as SpriteFrame[]);
-            void scope.load(BUNDLES.battleUi, MATCH_SPINE_PATH, sp.SkeletonData).then(data => {
+            void scope.load(BUNDLES.battleRuntime, MATCH_SPINE_PATH, sp.SkeletonData).then(data => {
                 if (isValid(view, true)) view.animate(data);
             }).catch(error => { if (isValid(view, true)) view.fail(error); });
             await SceneFlow.instance.enter('battle', state => { if (isValid(view, true)) view.progress(state.progress); });

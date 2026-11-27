@@ -1,4 +1,4 @@
-import { DEPLOYABLE_HERO_IDS, HeroId } from '../../model/config/PrototypeConfig';
+import { HeroId } from '../../model/config/PrototypeConfig';
 import { rangedAttack } from '../../model/battle/CombatTiming';
 import { BUNDLES } from '../../core/Bundles';
 
@@ -42,13 +42,16 @@ export function setupCenter(header?: { x: number; y: number; width: number; heig
         !(header.width > 0) || !(header.height > 0)) return undefined;
     return { x: header.x + header.width / 2, y: header.y + header.height / 2 };
 }
-/** VS spine ships with battle_ui_bundle and is authored on MatchView/VSView. */
+/** VS spine ships with battle_runtime and is authored on MatchView/VSView. */
 export const MATCH_SPINE_PATH = 'animations/pipei/UI_pipei_VS';
-export const SETTLEMENT_SPINE_PATH = 'animations/shengli_shibai/UI_shengli_shibai';
+export const SETTLEMENT_SPINE_PATH = 'results/animations/shengli_shibai/UI_shengli_shibai';
+export const SETTLEMENT_PREFAB_PATH = 'results/BattleSettlement';
+export const ROUND_SETTLEMENT_PREFAB_PATH = 'transitions/RoundSettlement';
+export const BATTLE_PAUSE_PREFAB_PATH = 'pause/BattlePause';
 export interface BattleMapDefinition { id: string; name: string; bundle: string; path: string }
 /** The beginner map is local; the remaining authored maps stay in remote map_bundle. */
 export const BATTLE_MAPS: readonly BattleMapDefinition[] = [
-    { id: 'map_1_1', name: '地图一', bundle: BUNDLES.tutorial, path: 'prefabs/map/map_1_1' },
+    { id: 'map_1_1', name: '地图一', bundle: BUNDLES.battleRuntime, path: 'prefabs/tutorial/map/map_1_1' },
     { id: 'map_1_2', name: '地图二', bundle: BUNDLES.map, path: 'prefabs/map_1_2' },
     { id: 'map_1_3', name: '地图三', bundle: BUNDLES.map, path: 'prefabs/map_1_3' },
     { id: 'map_1_4', name: '地图四', bundle: BUNDLES.map, path: 'prefabs/map_1_4' },
@@ -84,16 +87,27 @@ export function battleMapById(id: string): BattleMapDefinition {
     return found;
 }
 export const SETTLEMENT_ART_PATHS = {
-    victory: 'textures/ui/victory_icon/spriteFrame',
-    failure: 'textures/ui/fail_icon/spriteFrame',
+    victory: 'results/textures/victory_icon/spriteFrame',
+    failure: 'results/textures/fail_icon/spriteFrame',
 } as const;
-export function battleContentPaths(ids: readonly string[]): string[] {
-    return Array.from(new Set([
+export interface CombatContentReference { bundle: string; path: string }
+/** Batched troop animations stay in the shared remote pack; named heroes live separately. */
+export function combatBundleForAssetPath(path: string): string {
+    return path.startsWith('heroes/animations/') && !path.startsWith('heroes/animations/batched/')
+        ? BUNDLES.combatHeroes : BUNDLES.combatShared;
+}
+export function battleContentReferences(ids: readonly string[]): CombatContentReference[] {
+    const paths = [
         'battle/animations/dizuo/hu_hong_lan', 'battle/animations/dangong/nu_lan', 'battle/animations/dangong/nu_hong',
         'battle/animations/pengzhuang/zhuanjihuohua', 'battle/animations/zengbing/hu_hong_lan_tx', 'battle/animations/death/si_tongyong',
         ...ids.map(id => BATTLE_TROOP_PATHS[id]),
         ...ids.map(id => HERO_MELEE_EFFECTS[id as HeroId] ?? HERO_RANGED_ART[id as HeroId]?.path ?? '').filter(Boolean),
         ...ids.map(id => { const attack = rangedAttack(id as HeroId); return attack && !HERO_RANGED_ART[id as HeroId] ? `heroes/animations/batched/${attack.kind}` : ''; }).filter(Boolean),
-    ]));
+    ];
+    const unique = new Map<string, CombatContentReference>();
+    for (const path of Array.from(new Set(paths))) {
+        const bundle = combatBundleForAssetPath(path);
+        unique.set(`${bundle}:${path}`, { bundle, path });
+    }
+    return Array.from(unique.values());
 }
-export const BATTLE_CONTENT_PATHS = battleContentPaths(DEPLOYABLE_HERO_IDS);

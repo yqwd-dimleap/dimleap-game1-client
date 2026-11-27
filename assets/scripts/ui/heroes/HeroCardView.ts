@@ -1,9 +1,16 @@
 import { ViewNodes } from '../binding/ViewNodes';
-import { _decorator, Button, Component, isValid, Label, ProgressBar, Sprite, SpriteFrame } from 'cc';
+import { _decorator, Button, Component, EventMouse, EventTouch, game, input, Input, isValid, Label, NodeEventType, ProgressBar, ScrollView, Sprite, SpriteFrame, Vec3, view } from 'cc';
+import type { Node as CocosNode } from 'cc';
 import type { HeroDefinition } from '../../model/config/PrototypeConfig';
 import { HeroProgress, heroCardState } from '../../model/hero/HeroProgress';
 
 export interface HeroCardArt { frames: readonly SpriteFrame[]; levels: readonly SpriteFrame[]; names: readonly SpriteFrame[] }
+export interface HeroCardDragHandlers {
+    start(point: Vec3, source: CocosNode): void;
+    move(point: Vec3): void;
+    end(point: Vec3): void;
+    cancel(): void;
+}
 
 /** Presentation of an authored collection card, with no Inspector node references. */
 @_decorator.ccclass('HeroCardView')
@@ -11,9 +18,165 @@ export class HeroCardView extends Component {
     private bindings?: ViewNodes;
     private get ui(): ViewNodes { return this.bindings ?? (this.bindings = new ViewNodes(this.node)); }
     private click?: () => void;
-    initialize(click: () => void): void {
-        this.dispose(); this.click = click;
-        this.node.on(Button.EventType.CLICK, click);
+    private drag?: HeroCardDragHandlers;
+    private longPressTimer?: ReturnType<typeof setTimeout>;
+    private touchStart = new Vec3();
+    private touchActive = false;
+    private longPress = false;
+    private ignoreClicksUntil = 0;
+    private scrollView?: ScrollView;
+    private globalDragInput = false;
+    private readonly pointer = (event: EventTouch | EventMouse): Vec3 => {
+        const point = event.getUILocation();
+        return new Vec3(point.x, point.y, 0);
+    };
+    private readonly onTouchStart = (event: EventTouch): void => {
+        if (!this.drag || this.touchActive) return;
+        const point = this.pointer(event);
+        this.touchStart.set(point);
+        this.touchActive = true;
+        this.longPress = false;
+        this.longPressTimer = setTimeout(() => {
+            this.longPressTimer = undefined;
+            if (!this.touchActive || !this.drag) return;
+            this.longPress = true;
+            // Button dispatches CLICK from its own TOUCH_END before this component's
+            // handler runs, so suppress it as soon as the long press is armed.
+            this.ignoreClicksUntil = Number.POSITIVE_INFINITY;
+            if (this.scrollView) this.scrollView.enabled = false;
+            this.bindGlobalDragInput();
+            this.drag.start(this.touchStart.clone(), this.node);
+        }, 420);
+    };
+    private readonly onTouchMove = (event: EventTouch): void => {
+        if (!this.touchActive || !this.drag) return;
+        const point = this.pointer(event);
+        if (this.longPress) { this.drag.move(point); return; }
+        const dx = point.x - this.touchStart.x, dy = point.y - this.touchStart.y;
+        if (dx * dx + dy * dy > 144) this.clearLongPressTimer();
+    };
+    private readonly onTouchEnd = (event: EventTouch): void => {
+        if (!this.touchActive) return;
+        this.clearLongPressTimer();
+        this.finishLongPress(this.pointer(event));
+    };
+    private readonly onTouchCancel = (): void => {
+        this.clearLongPressTimer();
+        // Opening the modal can cancel the original card's touch. The global
+        // mouse/touch listeners remain responsible for finishing the gesture.
+        if (!this.longPress) this.cancelLongPress();
+    };
+    private readonly onGlobalTouchMove = (event: EventTouch): void => {
+        if (!this.touchActive || !this.longPress) return;
+        this.drag?.move(this.pointer(event));
+    };
+    private readonly onGlobalTouchEnd = (event: EventTouch): void => {
+        if (!this.touchActive || !this.longPress) return;
+        this.finishLongPress(this.pointer(event));
+    };
+    private readonly onGlobalTouchCancel = (): void => {
+        if (!this.touchActive || !this.longPress) return;
+        this.cancelLongPress();
+    };
+    private readonly onGlobalMouseMove = (event: EventMouse): void => {
+        if (!this.touchActive || !this.longPress) return;
+        this.drag?.move(this.pointer(event));
+    };
+    private readonly onGlobalMouseUp = (event: EventMouse): void => {
+        if (!this.touchActive || !this.longPress) return;
+        this.finishLongPress(this.pointer(event));
+    };
+    private readonly onDomPointerMove = (event: PointerEvent): void => {
+        if (!this.touchActive || !this.longPress) return;
+        const point = this.domPointer(event);
+        if (point) this.drag?.move(point);
+    };
+    private readonly onDomPointerUp = (event: PointerEvent): void => {
+        if (!this.touchActive || !this.longPress) return;
+        const point = this.domPointer(event);
+        if (point) this.finishLongPress(point);
+    };
+    private finishLongPress(point: Vec3): void {
+        if (!this.touchActive) return;
+        const dragged = this.longPress;
+        this.unbindGlobalDragInput();
+        if (dragged) {
+            this.ignoreClicksUntil = Date.now() + 160;
+            this.drag?.end(point);
+        }
+        if (this.scrollView && !this.scrollView.enabled) this.scrollView.enabled = true;
+        this.touchActive = false;
+        this.longPress = false;
+    }
+    private cancelLongPress(): void {
+        if (!this.touchActive) return;
+        const dragged = this.longPress;
+        this.unbindGlobalDragInput();
+        if (dragged) {
+            this.ignoreClicksUntil = Date.now() + 160;
+            this.drag?.cancel();
+        }
+        if (this.scrollView && !this.scrollView.enabled) this.scrollView.enabled = true;
+        this.touchActive = false;
+        this.longPress = false;
+    }
+    private bindGlobalDragInput(): void {
+        if (this.globalDragInput) return;
+        input.on(Input.EventType.TOUCH_MOVE, this.onGlobalTouchMove, this);
+        input.on(Input.EventType.TOUCH_END, this.onGlobalTouchEnd, this);
+        input.on(Input.EventType.TOUCH_CANCEL, this.onGlobalTouchCancel, this);
+        input.on(Input.EventType.MOUSE_MOVE, this.onGlobalMouseMove, this);
+        input.on(Input.EventType.MOUSE_UP, this.onGlobalMouseUp, this);
+        if (typeof window !== 'undefined') {
+            window.addEventListener('pointermove', this.onDomPointerMove, true);
+            window.addEventListener('pointerup', this.onDomPointerUp, true);
+        }
+        this.globalDragInput = true;
+    }
+    private unbindGlobalDragInput(): void {
+        if (!this.globalDragInput) return;
+        input.off(Input.EventType.TOUCH_MOVE, this.onGlobalTouchMove, this);
+        input.off(Input.EventType.TOUCH_END, this.onGlobalTouchEnd, this);
+        input.off(Input.EventType.TOUCH_CANCEL, this.onGlobalTouchCancel, this);
+        input.off(Input.EventType.MOUSE_MOVE, this.onGlobalMouseMove, this);
+        input.off(Input.EventType.MOUSE_UP, this.onGlobalMouseUp, this);
+        if (typeof window !== 'undefined') {
+            window.removeEventListener('pointermove', this.onDomPointerMove, true);
+            window.removeEventListener('pointerup', this.onDomPointerUp, true);
+        }
+        this.globalDragInput = false;
+    }
+    private domPointer(event: PointerEvent): Vec3 | null {
+        const canvas = game.canvas;
+        if (!canvas) return null;
+        const rect = canvas.getBoundingClientRect();
+        if (!(rect.width > 0) || !(rect.height > 0)) return null;
+        const visible = view.getVisibleSize();
+        return new Vec3(
+            (event.clientX - rect.left) / rect.width * visible.width,
+            (rect.bottom - event.clientY) / rect.height * visible.height,
+            0);
+    }
+    private readonly onClick = (): void => {
+        if (Date.now() >= this.ignoreClicksUntil) this.click?.();
+    };
+    private clearLongPressTimer(): void {
+        if (this.longPressTimer === undefined) return;
+        clearTimeout(this.longPressTimer);
+        this.longPressTimer = undefined;
+    }
+    initialize(click: () => void, drag?: HeroCardDragHandlers): void {
+        this.dispose(); this.click = click; this.drag = drag;
+        let parent = this.node.parent;
+        while (parent && !this.scrollView) {
+            this.scrollView = parent.getComponent(ScrollView) ?? undefined;
+            parent = parent.parent;
+        }
+        this.node.on(Button.EventType.CLICK, this.onClick, this);
+        this.node.on(NodeEventType.TOUCH_START, this.onTouchStart, this);
+        this.node.on(NodeEventType.TOUCH_MOVE, this.onTouchMove, this);
+        this.node.on(NodeEventType.TOUCH_END, this.onTouchEnd, this);
+        this.node.on(NodeEventType.TOUCH_CANCEL, this.onTouchCancel, this);
     }
     render(hero: HeroDefinition, entry: HeroProgress, icon: SpriteFrame | null, art?: HeroCardArt, unlocked?: boolean): void {
         const state = heroCardState(hero.id, entry, unlocked);
@@ -43,6 +206,18 @@ export class HeroCardView extends Component {
         this.ui.path('hero/fragments/Slash').active = !state.max;
         this.ui.at('hero/can_not_upgrade/ProgressBar', ProgressBar).progress = state.progress;
     }
-    dispose(): void { if (this.click && isValid(this.node, true)) this.node.off(Button.EventType.CLICK, this.click); this.click = undefined; }
+    dispose(): void {
+        this.clearLongPressTimer();
+        this.unbindGlobalDragInput();
+        if (!isValid(this.node, true)) return;
+        this.node.off(Button.EventType.CLICK, this.onClick, this);
+        this.node.off(NodeEventType.TOUCH_START, this.onTouchStart, this);
+        this.node.off(NodeEventType.TOUCH_MOVE, this.onTouchMove, this);
+        this.node.off(NodeEventType.TOUCH_END, this.onTouchEnd, this);
+        this.node.off(NodeEventType.TOUCH_CANCEL, this.onTouchCancel, this);
+        if (this.scrollView && !this.scrollView.enabled) this.scrollView.enabled = true;
+        this.scrollView = undefined;
+        this.click = undefined; this.drag = undefined;
+    }
     onDestroy(): void { this.dispose(); }
 }

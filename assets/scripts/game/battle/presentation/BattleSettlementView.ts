@@ -5,6 +5,13 @@ import type { PlayerProfile } from '../../../model/player/PlayerProfile';
 import { playerRank } from '../../../model/player/PlayerRank';
 import { loadPlayerBadge } from '../../../ui/common/PlayerUIAssets';
 import { RankLevelView } from '../../../ui/season/RankLevelView';
+
+export interface SettlementReward {
+    ok: boolean;
+    coins: number;
+    merit: number;
+}
+
 @_decorator.ccclass('BattleSettlementView')
 export class BattleSettlementView extends Component {
     private ui?: ViewNodes;
@@ -24,9 +31,11 @@ export class BattleSettlementView extends Component {
         ui.at('bg/fail_icon', Sprite).spriteFrame = failureArt;
         this.detail = this.node.getChildByPath('Detail')?.getComponent(Label) ?? this.createDetailLabel();
         this.rankLevel = this.node.getChildByPath('player_node/RankLevel')?.getComponent(RankLevelView) ?? undefined;
+        const doubleReward = this.node.getChildByName('btn_double');
+        if (doubleReward) doubleReward.active = false;
     }
     show(winner: 0 | 1 | 'draw', detail: string, player: Readonly<PlayerProfile>,
-        resources: ResourceLoader, back: () => void): void {
+        resources: ResourceLoader, back: () => void, reward: SettlementReward): void {
         const ui = this.ui ?? (this.ui = new ViewNodes(this.node));
         this.node.active = true;
         // The refreshed prefab keeps both result icons authored, but the Spine node
@@ -34,12 +43,25 @@ export class BattleSettlementView extends Component {
         // Treat a draw as the non-victory result until a dedicated draw asset exists.
         ui.path('bg/victory_icon').active = winner === 0;
         ui.path('bg/fail_icon').active = winner !== 0;
+        const successReward = this.node.getChildByName('success_reward');
+        const failureReward = this.node.getChildByName('failure_reward');
+        if (successReward) successReward.active = reward.ok && winner === 0;
+        if (failureReward) failureReward.active = reward.ok && winner !== 0;
+        if (reward.ok) {
+            this.setRewardValue('success_reward/icon_frame_1/value', reward.coins);
+            this.setRewardValue('success_reward/icon_frame_2/value', reward.merit);
+            this.setRewardValue('failure_reward/icon_frame_1/value', reward.coins);
+        }
         const detailLabel = this.detail ?? (this.detail = this.node.getChildByPath('Detail')?.getComponent(Label) ?? this.createDetailLabel());
         if (detailLabel) detailLabel.string = (winner === 'draw' ? '平局\n' : '') + detail;
         this.renderPlayer(player, resources);
         const spine = ui.at('ani', sp.Skeleton);
         this.playSpine(spine, winner === 0 ? 'shengli' : 'shibai');
         this.unbindBack(); this.back = back; this.backNode = ui.path('btn_back'); this.backNode.on(Button.EventType.CLICK, back);
+    }
+    private setRewardValue(path: string, value: number): void {
+        const label = this.node.getChildByPath(path)?.getComponent(Label);
+        if (label) label.string = `x${value}`;
     }
     private renderPlayer(player: Readonly<PlayerProfile>, resources: ResourceLoader): void {
         const revision = ++this.playerRevision, rank = playerRank(player.netStars);

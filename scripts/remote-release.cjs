@@ -115,11 +115,16 @@ function remoteDirectory(output, selectedVersion) {
     return path.join(output, `remote_v${selectedVersion}`, 'remote');
 }
 
-function assertBundleConfig(directory, name) {
+function bundleHasConfig(directory, name) {
     const bundleDirectory = path.join(directory, name);
     const files = fs.existsSync(bundleDirectory) ? fs.readdirSync(bundleDirectory) : [];
-    const configs = files.filter(file => /^config\.[0-9a-f]{5,32}\.json$/.test(file));
-    if (!configs.length) throw new Error(
+    return files.some(file => /^config\.[0-9a-f]{5,32}\.json$/.test(file));
+}
+
+function assertBundleConfig(directory, name) {
+    const bundleDirectory = path.join(directory, name);
+    if (bundleHasConfig(directory, name)) return;
+    throw new Error(
         `missing MD5 bundle config for ${name} at ${bundleDirectory}; enable md5Cache before building`,
     );
 }
@@ -144,6 +149,9 @@ function stage(command, options) {
     const existing = readManifest(output);
     const previous = existing?.current && version(existing.current) !== selectedVersion
         ? version(existing.current) : existing?.previous;
+    const retainedBundles = Object.fromEntries(Object.entries(existing?.bundles || {})
+        .filter(([name]) => !bundles.includes(name))
+        .map(([name, value]) => [name, version(value, `${name} version`)]));
     const fallback = options.fallback ? version(options.fallback, 'fallback')
         : previous || existing?.fallback || selectedVersion;
     const updatedAt = new Date().toISOString();
@@ -166,7 +174,12 @@ function stage(command, options) {
         next: null,
         gray_percent: 0,
         force_restart: false,
-        bundles: Object.fromEntries(bundles.map(name => [name, selectedVersion])),
+        // Keep explicit mappings for renamed/retired bundles so older clients can
+        // continue loading their immutable previous directories.
+        bundles: {
+            ...retainedBundles,
+            ...Object.fromEntries(bundles.map(name => [name, selectedVersion])),
+        },
         updated_at: updatedAt,
     };
     writeJson(manifestPath(output), manifest);
@@ -186,9 +199,16 @@ function activate(command, options, rollback) {
         throw new Error(`remote version is not staged: ${target}`);
 
     const previousCurrent = existing.current ? version(existing.current) : undefined;
-    const bundleKeys = Object.keys(existing.bundles || {});
-    for (const name of bundleKeys) assertBundleConfig(target, name);
     const updatedAt = new Date().toISOString();
+    const targetDirectory = remoteDirectory(output, selectedVersion);
+    const nextBundles = Object.fromEntries(Object.entries(existing.bundles || {}).map(([name, value]) => {
+        const normalized = version(value, `${name} version`);
+        const canMove = normalized === previousCurrent && bundleHasConfig(targetDirectory, name);
+        return [name, canMove ? selectedVersion : normalized];
+    }));
+    for (const [name, selectedBundleVersion] of Object.entries(nextBundles)) {
+        assertBundleConfig(remoteDirectory(output, selectedBundleVersion), name);
+    }
     const manifest = {
         ...existing,
         schema: 1,
@@ -198,7 +218,7 @@ function activate(command, options, rollback) {
         previous: previousCurrent && previousCurrent !== selectedVersion ? previousCurrent : existing.previous || null,
         rollback_to: null,
         updated_at: updatedAt,
-        bundles: Object.fromEntries(bundleKeys.map(name => [name, selectedVersion])),
+        bundles: nextBundles,
     };
     writeJson(manifestPath(output), manifest);
     console.log(`[remote] ${rollback ? 'rolled back' : 'activated'} ${selectedVersion}`);

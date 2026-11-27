@@ -1,0 +1,14 @@
+{
+  "ver": "1.2.0",
+  "importer": "directory",
+  "imported": true,
+  "uuid": "5f613692-c2b6-4026-986c-ac23381b4f3c",
+  "files": [],
+  "subMetas": {},
+  "userData": {
+    "isBundle": true,
+    "bundleName": "combat_shared",
+    "priority": 4,
+    "bundleConfigID": "remote-content"
+  }
+}

@@ -49,9 +49,9 @@ export class SeasonController extends Component {
             resources.load(BUNDLES.seasonContent, 'ui/textures/rank/ranking_other_item/spriteFrame', SpriteFrame, undefined, 'normal'),
             resources.load(BUNDLES.seasonContent, 'ui/textures/rank/ranking_my_item/spriteFrame', SpriteFrame, undefined, 'normal'),
             Promise.all(Array.from({ length: 11 }, (_, index) =>
-                resources.load(BUNDLES.ui, `textures/level/level_${index + 1}/spriteFrame`, SpriteFrame, undefined, 'normal'))),
+                resources.load(BUNDLES.seasonContent, `ui/textures/level/level_${index + 1}/spriteFrame`, SpriteFrame, undefined, 'normal'))),
             Promise.all(Array.from({ length: 11 }, (_, index) =>
-                resources.load(BUNDLES.ui, `textures/level/title_bg_${index + 1}/spriteFrame`, SpriteFrame, undefined, 'normal'))),
+                resources.load(BUNDLES.seasonContent, `ui/textures/level/title_bg_${index + 1}/spriteFrame`, SpriteFrame, undefined, 'normal'))),
         ]);
         if (!isValid(this, true) || this.disposed) throw new Error('Season page was destroyed while loading');
         this.resources = resources; this.store = store; this.stars = stars; this.modals = modals;

@@ -90,7 +90,7 @@ export class HeroBattleGMPanel extends Component {
         bind('EnemyOutlineUp', () => this.changeEnemyOutlineScale(ENEMY_OUTLINE_SCALE_LIMIT.step), false);
         this.status('正在加载攻击测试资源…');
         try {
-            const [, prefab] = await Promise.all([this.assets.load(scope, HERO_IDS), scope.load(BUNDLES.battle, 'prefabs/ArrowProjectile', Prefab)]);
+            const [, prefab] = await Promise.all([this.assets.load(scope, HERO_IDS), scope.load(BUNDLES.battleRuntime, 'prefabs/ArrowProjectile', Prefab)]);
             if (this.disposed || !isValid(this, true)) return;
             this.actor = this.ui.at('hero_attack', TroopSpineView);
             this.target = this.ui.at('Target', TroopSpineView);

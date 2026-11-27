@@ -191,11 +191,13 @@ export class DeploymentController {
         }
         for (const token of this.state.tokens) if (token.launched) token.settleBase();
         const snapshot = this.state.tokens.filter(token => token.launched && token.enteredArena).map(token => token.snapshot());
-        const bonuses = [0, 0]; for (const token of snapshot) bonuses[token.team] += bonusAt(token, this.state.zones);
+        const bonuses = [0, 0];
+        for (const token of snapshot)
+            bonuses[token.team] += bonusAt(token, this.state.zones, RULES.tokenRadius, RULES.zoneContactDepth);
         this.state.latestOutcome = `停稳：蓝方 +${bonuses[0]}，红方 +${bonuses[1]}`;
         this.ports.shotSettled(bonuses as [number, number]);
         if (DEBUG) console.info('[Prototype] settled', JSON.stringify(this.ports.snapshot()));
-        this.ports.label('guide', `${this.state.latestOutcome} · 每枚 Token 独立按中心点判区`);
+        this.ports.label('guide', `${this.state.latestOutcome} · 底座接触增益区即可占领`);
         this.state.turn = this.state.turn === 0 ? 1 : 0;
         this.ports.prepareTurn();
     }

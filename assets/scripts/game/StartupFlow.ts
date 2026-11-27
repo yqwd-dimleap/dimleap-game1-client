@@ -1,4 +1,5 @@
 export interface StartupProgress { progress: number; message: string }
+export const HOME_READY_EVENT = 'rune:home-ready';
 export interface StartupPorts {
     initialize(): Promise<void>;
     checkVersion(): Promise<void>;
@@ -40,7 +41,7 @@ export class StartupFlow {
             ]);
             progress(0.55, '进入游戏');
             await this.ports.enterHome(state => progress(0.55 + 0.45 * state.progress, state.message));
-            progress(1, '加载完成');
+            progress(0.98, '准备显示界面');
         }).then(() => { active = false; this.pending = undefined; }, error => {
             active = false; this.pending = undefined; throw error;
         });

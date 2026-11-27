@@ -1,7 +1,7 @@
 import { SceneFlow } from '../SceneFlow';
 import { ResourceScope } from '../../core/ResourceScope';
 import { BUNDLES } from '../../core/Bundles';
-import { _decorator, Component, instantiate, isValid, Label, Node, Prefab } from 'cc';
+import { _decorator, Component, game, instantiate, isValid, Label, Node, Prefab } from 'cc';
 import { GameApp } from '../GameApp';
 import { HomeController } from './HomeController';
 import { MainPageRouter } from '../main/MainPageRouter';
@@ -9,6 +9,7 @@ import { MainShellView, MainPage } from '../../ui/main/MainShellView';
 import { HeroesController } from '../heroes/HeroesController';
 import { SeasonController } from '../season/SeasonController';
 import { ModalHost } from '../../ui/common/ModalHost';
+import { HOME_READY_EVENT } from '../StartupFlow';
 const { ccclass } = _decorator;
 
 /** Scene owns the Canvas; the bundle owns the complete editable HomeView prefab. */
@@ -69,11 +70,13 @@ export class HomeShellController extends Component {
             await this.select('home');
             if (!isValid(this, true)) return;
             const status = this.node.getChildByName('ShellStatus'); if (status) status.active = false;
+            game.emit(HOME_READY_EVENT, true);
         } catch (error) {
             if (!isValid(this, true)) return;
             console.error('[Home shell]', error);
             const label = this.node.getChildByName('ShellStatus')?.getComponent(Label);
             if (label) { label.string = '大厅加载失败，请重新启动。'; label.node.active = true; }
+            game.emit(HOME_READY_EVENT, false);
         }
     }
     private async select(page: MainPage): Promise<void> {

@@ -1,5 +1,5 @@
 import { GameTables } from './GameTables';
-import { MAX_ZONE_BONUS, zoneContains } from '../battle/BattleMap';
+import { MAX_ZONE_BONUS, zoneContains, zoneOverlapsCircle } from '../battle/BattleMap';
 import { RULES } from '../battle/BattleRuntime';
 import type { HeroId, HeroDefinition, Point, Zone } from '../battle/types';
 export type { Team, HeroId, Point, ArenaEdges, RailRect, Zone, Deployment, HeroDefinition } from '../battle/types';
@@ -68,9 +68,9 @@ export const ZONES: Zone[] = [
 ];
 export const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v));
 export const distance = (a: Point, b: Point): number => Math.hypot(a.x - b.x, a.y - b.y);
-export function zoneAt(p: Point, zones: readonly Zone[] = ZONES): Zone | undefined {
-    return zones.find(z => zoneContains(p, z));
+export function zoneAt(p: Point, zones: readonly Zone[] = ZONES, radius = 0, minOverlap = 0): Zone | undefined {
+    return zones.find(z => radius > 0 ? zoneOverlapsCircle(p, radius, z, minOverlap) : zoneContains(p, z));
 }
-export function bonusAt(p: Point, zones: readonly Zone[] = ZONES): number {
-    return Math.max(0, Math.min(MAX_ZONE_BONUS, zoneAt(p, zones)?.bonus ?? 0));
+export function bonusAt(p: Point, zones: readonly Zone[] = ZONES, radius = 0, minOverlap = 0): number {
+    return Math.max(0, Math.min(MAX_ZONE_BONUS, zoneAt(p, zones, radius, minOverlap)?.bonus ?? 0));
 }

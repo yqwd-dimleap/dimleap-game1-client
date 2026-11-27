@@ -1,0 +1,39 @@
+{
+"skeleton": { "hash": "2uyEWkK003w", "spine": "4.2.43", "x": -35.5, "y": 20.12, "width": 71, "height": 47 },
+"bones": [
+	{ "name": "root" },
+	{ "name": "bone", "parent": "root" }
+],
+"slots": [
+	{ "name": "duanjiantou", "bone": "bone", "attachment": "duanjiantou" }
+],
+"skins": [
+	{
+		"name": "default",
+		"attachments": {
+			"duanjiantou": {
+				"duanjiantou": { "y": 43.62, "width": 71, "height": 47 }
+			}
+		}
+	}
+],
+"animations": {
+	"animation": {
+		"bones": {
+			"bone": {
+				"translate": [
+					{
+						"curve": [ 0.125, 0, 0.375, 0, 0.125, 0, 0.375, -12.73 ]
+					},
+					{
+						"time": 0.5,
+						"y": -12.73,
+						"curve": [ 0.625, 0, 0.875, 0, 0.625, -12.73, 0.875, 0 ]
+					},
+					{ "time": 1 }
+				]
+			}
+		}
+	}
+}
+}

@@ -5,7 +5,7 @@ export const MAX_ZONE_BONUS = 3;
 export interface MapBounds { width: number; height: number; centerX?: number; centerY?: number }
 export interface ZoneBounds { left: number; right: number; bottom: number; top: number }
 
-/** The token centre owns a zone; polygon edges are included. Points are relative to the zone centre. */
+/** Whether a point is inside a zone; polygon edges are included. Points are relative to the zone centre. */
 export function zoneContains(point: Point, zone: Zone): boolean {
     const x = point.x - zone.x, y = point.y - zone.y, vertices = zone.polygon;
     if (!vertices) return Math.hypot(x, y) <= zone.radius;
@@ -18,6 +18,29 @@ export function zoneContains(point: Point, zone: Zone): boolean {
         if ((a.y > y) !== (b.y > y) && x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x) inside = !inside;
     }
     return inside;
+}
+
+/** A token circle occupies a zone after it visibly penetrates by minOverlap design pixels. */
+export function zoneOverlapsCircle(point: Point, radius: number, zone: Zone, minOverlap = 0): boolean {
+    if (!Number.isFinite(radius) || radius < 0) throw new Error(`Invalid overlap radius: ${radius}`);
+    if (!Number.isFinite(minOverlap) || minOverlap < 0 || minOverlap > radius)
+        throw new Error(`Invalid minimum overlap: ${minOverlap}`);
+    if (zoneContains(point, zone)) return true;
+    const x = point.x - zone.x, y = point.y - zone.y, vertices = zone.polygon;
+    const effectiveRadius = radius - minOverlap;
+    if (!vertices) return Math.hypot(x, y) <= zone.radius + effectiveRadius;
+    const radiusSquared = effectiveRadius * effectiveRadius;
+    for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
+        const a = vertices[j], b = vertices[i], dx = b.x - a.x, dy = b.y - a.y;
+        const lengthSquared = dx * dx + dy * dy;
+        const t = lengthSquared > 0
+            ? Math.max(0, Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / lengthSquared))
+            : 0;
+        const closestX = a.x + dx * t, closestY = a.y + dy * t;
+        const offsetX = x - closestX, offsetY = y - closestY;
+        if (offsetX * offsetX + offsetY * offsetY <= radiusSquared + 1e-6) return true;
+    }
+    return false;
 }
 
 export function zoneBounds(zone: Zone): ZoneBounds {

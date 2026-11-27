@@ -8,6 +8,7 @@ export const DEFAULT_BATTLE_RULES = Object.freeze({
     stopSpeed: 0.12, stopAngularSpeed: 1, stopHold: 0.4, maxShotSeconds: 7,
     physicsStep: 1 / 60, combatStep: 1 / 30, combatSeconds: 45,
     actionPoints: 6, labTokenLimit: 12, spawnY: 510,
+    zoneContactDepth: 6,
     maxLaunchAngle: 55,
     arrowFlightMultiplier: 1.5,
 });

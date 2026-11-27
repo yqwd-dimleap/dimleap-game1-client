@@ -3,7 +3,7 @@ import { DEFAULT_BATTLE_RULES } from '../config/BattleRules';
 
 export type BattleTuning = Pick<typeof RULES, 'launchMultiplier' | 'powerCurve' | 'damping' | 'restitution' | 'wallRestitution' |
     'minSpeed' | 'maxSpeed' | 'minDrag' | 'maxDrag' | 'stopSpeed' | 'stopHold' | 'maxShotSeconds' |
-    'troopScale' | 'tokenTroopScale' | 'arrowFlightMultiplier'>;
+    'zoneContactDepth' | 'troopScale' | 'tokenTroopScale' | 'arrowFlightMultiplier'>;
 export type TuningKey = keyof BattleTuning;
 export type TuningGroup = 'collision' | 'troop';
 export interface TuningField { key: TuningKey; label: string; min: number; max: number; step: number; group: TuningGroup; advanced?: boolean }
@@ -20,6 +20,7 @@ export const TUNING_FIELDS: ReadonlyArray<TuningField> = [
     { key: 'stopSpeed', label: '停稳速度 (m/s)', min: .03, max: .3, step: .01, group: 'collision', advanced: true },
     { key: 'stopHold', label: '持续停稳时间 (秒)', min: .15, max: .8, step: .05, group: 'collision', advanced: true },
     { key: 'maxShotSeconds', label: '超时保护下限 (秒)', min: 3, max: 15, step: .5, group: 'collision', advanced: true },
+    { key: 'zoneContactDepth', label: '增益区有效接触深度 (px)', min: 0, max: 20, step: 1, group: 'collision', advanced: true },
     { key: 'tokenTroopScale', label: '底座兵种缩放', min: .1, max: 1.5, step: .05, group: 'troop' },
     { key: 'troopScale', label: '战斗兵种缩放', min: .1, max: 1.5, step: .05, group: 'troop' },
     { key: 'arrowFlightMultiplier', label: '弓箭飞行时长倍率', min: .5, max: 3, step: .1, group: 'troop' },

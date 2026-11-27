@@ -2,7 +2,7 @@ import { ResourceScope } from '../core/ResourceScope';
 import { BUNDLES } from '../core/Bundles';
 import { assetManager, director, Prefab, SceneAsset, sp } from 'cc';
 import { GameApp } from './GameApp';
-import { battleContentPaths, battleMapById } from './battle/BattleContent';
+import { battleContentReferences, battleMapById } from './battle/BattleContent';
 export type Route = 'home' | 'battle';
 import { STARTER_LINEUP } from '../model/hero/HeroProgress';
 import type { LoadingState } from '../core/LoadingState';
@@ -10,7 +10,7 @@ import { DEBUG } from 'cc/env';
 export type { LoadingState } from '../core/LoadingState';
 const ROUTES = {
     home: { bundle: 'main', scene: 'main', prefabs: [] as string[] },
-    battle: { bundle: BUNDLES.battle, scene: 'battle', prefabs: ['prefabs/HeroToken', 'prefabs/Unit'] },
+    battle: { bundle: BUNDLES.battleRuntime, scene: 'battle', prefabs: ['prefabs/HeroToken', 'prefabs/Unit'] },
 };
 export class SceneFlow {
     static readonly instance = new SceneFlow();
@@ -32,7 +32,9 @@ export class SceneFlow {
         const task = (async () => {
             const app = GameApp.instance;
             await app.initialize();
-            const bundles = [BUNDLES.ui, BUNDLES.tutorial, BUNDLES.battleUi, BUNDLES.battle];
+            // Home only requires the shared UI package. Battle runtime, including
+            // onboarding resources, is loaded by the battle flow.
+            const bundles = [BUNDLES.ui];
             let ready = 0;
             const started = Date.now();
             report({ progress: 0, message: '预加载启动资源' });
@@ -97,15 +99,15 @@ export class SceneFlow {
             const scope = app.res.createScope('prepare:tutorial');
             const started = Date.now();
             try {
-                report({ progress: 0.05, message: '加载新手引导分包' });
-                await app.res.bundle(BUNDLES.tutorial);
-                report({ progress: 0.25, message: '解析新手引导资源' });
+                report({ progress: 0.05, message: '加载战斗与新手引导分包' });
+                await app.res.bundle(BUNDLES.battleRuntime);
+                report({ progress: 0.25, message: '解析战斗与新手引导资源' });
                 const loads = [
-                    scope.load(BUNDLES.tutorial, 'prefabs/guide/NewbieGuide', Prefab, undefined, 'critical'),
-                    scope.load(BUNDLES.tutorial, 'prefabs/guide/MaskLayer', Prefab, undefined, 'critical'),
-                    scope.load(BUNDLES.tutorial, 'prefabs/guide/FingerGuide', Prefab, undefined, 'critical'),
-                    scope.load(BUNDLES.tutorial, 'animations/finger/nu_lanaaa', sp.SkeletonData, undefined, 'critical'),
-                    scope.load(BUNDLES.tutorial, 'prefabs/map/map_1_1', Prefab, undefined, 'critical'),
+                    scope.load(BUNDLES.battleRuntime, 'prefabs/tutorial/guide/NewbieGuide', Prefab, undefined, 'critical'),
+                    scope.load(BUNDLES.battleRuntime, 'prefabs/tutorial/guide/MaskLayer', Prefab, undefined, 'critical'),
+                    scope.load(BUNDLES.battleRuntime, 'prefabs/tutorial/guide/FingerGuide', Prefab, undefined, 'critical'),
+                    scope.load(BUNDLES.battleRuntime, 'animations/tutorial/finger/nu_lanaaa', sp.SkeletonData, undefined, 'critical'),
+                    scope.load(BUNDLES.battleRuntime, 'prefabs/tutorial/map/map_1_1', Prefab, undefined, 'critical'),
                 ];
                 let loaded = 0;
                 await Promise.all(loads.map(load => load.then(() => {
@@ -152,16 +154,16 @@ export class SceneFlow {
             const preparedTutorial = route === 'battle' && app.isTutorialBattle ? this.preparedTutorial : undefined;
             if (preparedTutorial) this.preparedTutorial = undefined;
             incoming = preparedHome?.scope ?? preparedTutorial?.scope ?? app.res.createScope(`scene:${route}`);
-            const localBundles = route === 'battle'
+            const requiredBundles = route === 'battle'
                 ? app.isTutorialBattle ?
-                    [BUNDLES.ui, BUNDLES.battle, BUNDLES.tutorial] :
-                    [BUNDLES.ui, BUNDLES.battle, BUNDLES.heroes]
+                    [BUNDLES.ui, BUNDLES.battleRuntime] :
+                    [BUNDLES.ui, BUNDLES.battleRuntime, BUNDLES.heroes]
                 : [BUNDLES.ui];
             let bundlesReady = 0;
-            progress(0.03, '加载本地分包');
-            await Promise.all(localBundles.map(bundle => app.res.bundle(bundle).then(() => {
+            progress(0.03, '加载战斗依赖');
+            await Promise.all(requiredBundles.map(bundle => app.res.bundle(bundle).then(() => {
                 bundlesReady++;
-                progress(0.03 + 0.15 * bundlesReady / localBundles.length, `加载本地分包 ${bundle}`);
+                progress(0.03 + 0.15 * bundlesReady / requiredBundles.length, `加载战斗依赖 ${bundle}`);
             })));
             progress(0.18, '加载场景资源');
             if (route === 'battle') {
@@ -170,10 +172,10 @@ export class SceneFlow {
                 const selectedMap = battleMapById(app.isTutorialBattle ? 'map_1_1' : app.battleStart.map.mapId);
                 const lineup = app.isTutorialBattle ? STARTER_LINEUP :
                     app.heroes.snapshot().lineup.filter((id): id is NonNullable<typeof id> => !!id);
-                const paths = app.isTutorialBattle ? [] : battleContentPaths([...lineup, ...STARTER_LINEUP]);
+                const references = app.isTutorialBattle ? [] : battleContentReferences([...lineup, ...STARTER_LINEUP]);
                 await Promise.all([
-                    ...paths.map(path => incoming!.load(BUNDLES.combatContent, path, sp.SkeletonData, undefined, 'critical').then(() => {
-                        loaded++; progress(0.18 + 0.1 * loaded / paths.length, '加载首战资源');
+                    ...references.map(reference => incoming!.load(reference.bundle, reference.path, sp.SkeletonData, undefined, 'critical').then(() => {
+                        loaded++; progress(0.18 + 0.1 * loaded / references.length, '加载首战资源');
                     })),
                     incoming.load(selectedMap.bundle, selectedMap.path, Prefab, (finished, total) => {
                         progress(0.18 + 0.14 * (total ? finished / total : 0), `预加载地图 ${selectedMap.name}`);

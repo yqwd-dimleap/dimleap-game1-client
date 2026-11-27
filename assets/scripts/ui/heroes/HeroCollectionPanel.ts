@@ -1,12 +1,14 @@
-import { Button, instantiate, isValid, Node, Prefab, SpriteFrame, UITransform, sp } from 'cc';
-import { HeroId, DEPLOYABLE_HERO_IDS } from '../../model/config/PrototypeConfig';
+import { Button, instantiate, isValid, Node, Prefab, SpriteFrame, UITransform, Vec3, sp } from 'cc';
+import { HeroId, HEROES, DEPLOYABLE_HERO_IDS } from '../../model/config/PrototypeConfig';
 import { HeroProgressStore, heroStats } from '../../model/hero/HeroProgress';
 import { HeroCardArt, HeroCardView } from './HeroCardView';
 import { LineupHeroCardView } from './LineupHeroCardView';
+import { HeroReplaceView } from './HeroReplaceView';
 import { HeroDetailView } from './HeroDetailView';
 import { HeroLevelUpDetailView } from './HeroLevelUpDetailView';
 import { HeroSelectView } from './HeroSelectView';
 import type { ModalPresenter } from '../common/ModalHost';
+import { ToastService } from '../common/ToastService';
 
 export interface HeroOverlayPrefabs {
     select: Prefab;
@@ -17,6 +19,7 @@ export interface HeroOverlayPrefabs {
 export interface HeroCollectionAssets {
     card: Prefab;
     lineup: Prefab;
+    replace: Prefab;
     icons: (SpriteFrame | null)[];
     cardArt?: HeroCardArt;
     preview: (id: HeroId) => Promise<sp.SkeletonData>;
@@ -33,21 +36,27 @@ export class HeroCollectionPanel {
     private selectionNode?: Node;
     private detailNode?: Node;
     private levelUpNode?: Node;
+    private replaceNode?: Node;
     private selection?: HeroSelectView;
     private detail?: HeroDetailView;
     private levelUp?: HeroLevelUpDetailView;
+    private replaceView?: HeroReplaceView;
     private preview?: HeroCardView;
     private overlays?: Promise<HeroOverlayPrefabs>;
     private openRequest = 0;
     private message = '';
     private disposed = false;
     private actionPending = false;
+    private placementPending = false;
+    private replacingId: HeroId | null = null;
+    private readonly replaceSource = new Vec3();
 
     constructor(readonly node: Node, private store: HeroProgressStore,
         private assets: HeroCollectionAssets, private modals: ModalPresenter) {
         const content = node.getChildByPath('ScrollView/view/content');
         if (!content) throw new Error('HeroCollection requires ScrollView/view/content');
         this.bindUnlockControls();
+        this.ensureReplaceOverlay();
         DEPLOYABLE_HERO_IDS.forEach((id, i) => {
             const card = instantiate(assets.card);
             content.addChild(card);
@@ -56,7 +65,12 @@ export class HeroCollectionPanel {
             card.setPosition(-270 + i % 4 * 180, -128 - Math.floor(i / 4) * 240);
             const view = card.getComponent(HeroCardView);
             if (!view) throw new Error('HeroCard requires HeroCardView');
-            view.initialize(() => this.open(id, card));
+            view.initialize(() => this.open(id, card), {
+                start: (point, source) => this.beginReplace(id, point, source),
+                move: point => this.moveReplace(point),
+                end: point => { void this.finishReplace(point); },
+                cancel: () => this.cancelReplace(),
+            });
             this.cards.push(view);
         });
         content.getComponent(UITransform)!.setContentSize(750,
@@ -79,6 +93,61 @@ export class HeroCollectionPanel {
             this.listeners.push(() => { if (isValid(slot, true)) slot.off(Button.EventType.CLICK, click); });
         }
         this.refresh();
+    }
+
+    private ensureReplaceOverlay(): void {
+        const node = this.replaceNode = instantiate(this.assets.replace);
+        this.node.addChild(node);
+        this.owned.push(node);
+        node.active = false;
+        const view = this.replaceView = node.getComponent(HeroReplaceView) ?? node.addComponent(HeroReplaceView);
+        view.initialize(id => this.assets.preview(id));
+    }
+
+    private beginReplace(id: HeroId, point: Vec3, source: Node): void {
+        if (this.disposed || this.placementPending || !this.replaceNode || !this.replaceView) return;
+        if (!this.store.isUnlocked(id)) {
+            ToastService.show(`${HEROES[id].name}尚未解锁`);
+            return;
+        }
+        this.hide();
+        this.replacingId = id;
+        this.replaceSource.set(source.worldPosition);
+        this.modals.open(this.replaceNode, { bounds: this.replaceNode.getChildByName('Backdrop') ?? undefined });
+        this.replaceView.show(id, this.store.snapshot().lineup, point, this.replaceSource);
+    }
+
+    private moveReplace(point: Vec3): void {
+        if (!this.replacingId || this.placementPending) return;
+        this.replaceView?.moveTo(point);
+    }
+
+    private async finishReplace(point: Vec3): Promise<void> {
+        const id = this.replacingId, view = this.replaceView;
+        if (!id || !view || this.placementPending) return;
+        view.moveTo(point);
+        const index = view.targetIndex;
+        if (index < 0) { this.cancelReplace(); return; }
+        this.placementPending = true;
+        const result = await this.store.place(id, index);
+        this.placementPending = false;
+        if (this.disposed || this.replacingId !== id) return;
+        this.message = result.message;
+        ToastService.show(result.message);
+        this.closeReplaceOverlay();
+        this.refresh();
+    }
+
+    private cancelReplace(force = false): void {
+        if (this.placementPending && !force) return;
+        if (!this.replacingId && !this.replaceNode?.active) return;
+        this.closeReplaceOverlay();
+    }
+
+    private closeReplaceOverlay(): void {
+        this.replacingId = null;
+        this.replaceView?.hide();
+        if (this.replaceNode) this.modals.close(this.replaceNode);
     }
 
     private bindUnlockControls(): void {
@@ -239,6 +308,7 @@ export class HeroCollectionPanel {
     }
 
     hide(): void {
+        this.cancelReplace(true);
         if (this.levelUpNode) this.modals.close(this.levelUpNode);
         if (this.detailNode) this.modals.close(this.detailNode);
         if (this.selectionNode) this.modals.close(this.selectionNode);
@@ -250,15 +320,19 @@ export class HeroCollectionPanel {
         this.openRequest++;
         this.hide();
         this.disposed = true;
+        this.cancelReplace();
         this.listeners.splice(0).forEach(off => off());
         this.cards.forEach(card => card.dispose());
         this.preview?.dispose();
         this.selection?.dispose();
         this.detail?.dispose();
         this.levelUp?.dispose();
+        this.replaceView?.dispose();
         this.owned.splice(0).forEach(node => { if (isValid(node, true)) node.destroy(); });
         this.cards = [];
         this.slots = [];
+        this.replaceNode = undefined;
+        this.replaceView = undefined;
         this.overlays = undefined;
     }
 }

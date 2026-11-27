@@ -1,6 +1,6 @@
 import { _decorator, BoxCollider2D, CircleCollider2D, Collider2D, Component, EffectAsset, Node, Sprite, UITransform, Vec2, Vec3 } from 'cc';
 import { RULES, Zone } from '../../../model/config/PrototypeConfig';
-import { authoredZoneLayout, randomZoneLayout, zoneContains } from '../../../model/battle/BattleMap';
+import { authoredZoneLayout, randomZoneLayout, zoneOverlapsCircle } from '../../../model/battle/BattleMap';
 import type { CombatObstacle } from '../../../model/battle/CombatCollision';
 import { BattleZone } from './BattleZone';
 const { ccclass, property } = _decorator;
@@ -77,7 +77,7 @@ export class BattleMapView extends Component {
         return zones;
     }
 
-    /** Called after token motion so the selected buffer silhouette follows the real centre test. */
+    /** Called after token motion so highlights follow the same token-radius overlap used by settlement. */
     updateHighlights(tokens: readonly HighlightToken[], dt: number): readonly string[] {
         const previous = new Set(this.litZones);
         this.litZones.clear();
@@ -89,8 +89,10 @@ export class BattleMapView extends Component {
             .map(token => token.node.position);
         const step = Math.max(0, Math.min(dt, .1));
         for (const zone of this.current) {
-            const movingInside = movingCentres.some(point => zoneContains(point, zone));
-            const stoppedInside = stoppedCentres.some(point => zoneContains(point, zone));
+            const movingInside = movingCentres.some(point =>
+                zoneOverlapsCircle(point, RULES.tokenRadius, zone, RULES.zoneContactDepth));
+            const stoppedInside = stoppedCentres.some(point =>
+                zoneOverlapsCircle(point, RULES.tokenRadius, zone, RULES.zoneContactDepth));
             let active = movingInside || this.tutorialPulseActive;
             if (movingInside) {
                 this.releaseDelays.delete(zone.id);

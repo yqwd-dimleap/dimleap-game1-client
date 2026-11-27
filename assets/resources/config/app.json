@@ -2,18 +2,18 @@
   "version": "0.2.0-prototype",
   "minimumClientVersion": "0.2.0-prototype",
   "apiBaseUrl": "https://api.0ygame.cn/api/v1",
-  "devApiBaseUrl": "",
+  "devApiBaseUrl": "http://localhost:3000/api/v1",
   "remoteBaseUrl": { "web": "https://0ygame.cn", "wx": "https://gameweb.0ygame.cn", "tt": "" },
-  "remoteVersion": "1.0.0",
+  "remoteVersion": "1.0.4",
   "bundles": {
     "ui_bundle": { "delivery": "subpackage", "priority": 6, "dependencies": [] },
     "settings_ui": { "delivery": "remote", "priority": 4, "dependencies": ["ui_bundle"] },
-    "tutorial_bundle": { "delivery": "subpackage", "priority": 5, "dependencies": [] },
     "heroes_bundle": { "delivery": "remote", "priority": 4, "dependencies": ["ui_bundle"] },
-    "battle_bundle": { "delivery": "subpackage", "priority": 5, "dependencies": ["ui_bundle"] },
-    "battle_ui_bundle": { "delivery": "subpackage", "priority": 5, "dependencies": ["ui_bundle"] },
+    "battle_runtime": { "delivery": "subpackage", "priority": 5, "dependencies": ["ui_bundle"] },
+    "battle_presentation": { "delivery": "remote", "priority": 3, "dependencies": ["ui_bundle", "battle_runtime", "season_content"] },
     "map_bundle": { "delivery": "remote", "priority": 4, "dependencies": [] },
-    "combat_content": { "delivery": "remote", "priority": 4, "dependencies": ["ui_bundle"] },
+    "combat_shared": { "delivery": "remote", "priority": 4, "dependencies": ["ui_bundle"] },
+    "combat_heroes": { "delivery": "remote", "priority": 4, "dependencies": ["ui_bundle"] },
     "season_content": { "delivery": "remote", "priority": 4, "dependencies": ["ui_bundle"] }
   }
 }

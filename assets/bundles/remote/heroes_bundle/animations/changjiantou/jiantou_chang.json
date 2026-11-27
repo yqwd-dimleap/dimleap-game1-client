@@ -1,0 +1,50 @@
+{
+"skeleton": { "hash": "y6jIb56w4dc", "spine": "4.2.43", "x": -68.5, "y": 3.61, "width": 137, "height": 396 },
+"bones": [
+	{ "name": "root" },
+	{ "name": "bone", "parent": "root" }
+],
+"slots": [
+	{ "name": "changjiantou", "bone": "bone", "attachment": "changjiantou" }
+],
+"skins": [
+	{
+		"name": "default",
+		"attachments": {
+			"changjiantou": {
+				"changjiantou": { "y": 201.61, "width": 137, "height": 396 }
+			}
+		}
+	}
+],
+"animations": {
+	"animation": {
+		"bones": {
+			"bone": {
+				"translate": [
+					{
+						"curve": [ 0.125, 0, 0.375, 0, 0.125, 0, 0.375, 9.57 ]
+					},
+					{
+						"time": 0.5,
+						"y": 9.57,
+						"curve": [ 0.625, 0, 0.875, 0, 0.625, 9.57, 0.875, 0 ]
+					},
+					{ "time": 1 }
+				],
+				"scale": [
+					{
+						"curve": [ 0.125, 1, 0.375, 1, 0.125, 1, 0.375, 1.104 ]
+					},
+					{
+						"time": 0.5,
+						"y": 1.104,
+						"curve": [ 0.625, 1, 0.875, 1, 0.625, 1.104, 0.875, 1 ]
+					},
+					{ "time": 1 }
+				]
+			}
+		}
+	}
+}
+}

@@ -156,11 +156,15 @@ export class TokenBody extends Component {
         const position = this.node.position, probe = this.probe;
         probe.id = this.id; probe.team = this.team; probe.hero = this.hero; probe.level = this.level;
         probe.x = position.x; probe.y = position.y;
-        const count = this.launched ? deploymentTroopCount(probe, this.zones) : this.initialCount;
+        const count = this.launched
+            ? deploymentTroopCount(probe, this.zones, RULES.tokenRadius, RULES.zoneContactDepth)
+            : this.initialCount;
         // Leaving a zone removes troops immediately; passing through one never grants troops.
         if (policy === 'loss-only' && count >= this.shownCount) return 0;
         const hasBonus = count > this.initialCount;
-        this.bonusZoneId = hasBonus ? zoneAt(position, this.zones)?.id : undefined;
+        this.bonusZoneId = hasBonus
+            ? zoneAt(position, this.zones, RULES.tokenRadius, RULES.zoneContactDepth)?.id
+            : undefined;
         if (count === this.shownCount) return 0;
         this.bonusLabel.color = hasBonus ? BONUS_COLOR : NORMAL_COLOR;
         const previous = this.shownCount;

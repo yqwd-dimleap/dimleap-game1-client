@@ -6,7 +6,9 @@ import { TROOP_OUTLINE } from '../../../ui/theme/BattleTheme';
 import { ProjectileKind, rangedAttack, upwardAttack } from '../../../model/battle/CombatTiming';
 import { TOKEN_BASE_CLIPS, TOKEN_BASE_PATH } from './TokenBaseConfig';
 import { SpineBatchRenderer } from './SpineBatchRenderer';
-import { BATTLE_TROOP_PATHS, HERO_MELEE_EFFECTS, HERO_RANGED_ART, setupCenter } from '../BattleContent';
+import {
+    BATTLE_TROOP_PATHS, HERO_MELEE_EFFECTS, HERO_RANGED_ART, combatBundleForAssetPath, setupCenter,
+} from '../BattleContent';
 import { BATTLE_FEEDBACK, ENEMY_OUTLINE_SCALE_LIMIT, feedbackValue } from './BattleFeedbackSettings';
 
 export const TROOP_PATHS: Partial<Record<HeroId, string>> = BATTLE_TROOP_PATHS;
@@ -46,7 +48,7 @@ export class TroopAssets {
         const active = (): void => {
             if (generation !== this.loadGeneration) throw new Error('Troop resource loading cancelled');
         };
-        this.tokenBase = await res.load(BUNDLES.combatContent, `battle/${TOKEN_BASE_PATH}`, sp.SkeletonData, undefined, 'critical');
+        this.tokenBase = await res.load(BUNDLES.combatShared, `battle/${TOKEN_BASE_PATH}`, sp.SkeletonData, undefined, 'critical');
         active();
         const base = this.tokenBase.getRuntimeData();
         for (const clip of TOKEN_BASE_CLIPS) {
@@ -56,13 +58,13 @@ export class TroopAssets {
         for (const skin of ['lan', 'hong']) if (!base?.findSkin(skin)) throw new Error(`底座皮肤缺失：${skin}`);
         if (!(this.tokenBaseHeight > 0)) throw new Error('底座原始高度无效');
         this.launchers = await Promise.all([
-            res.load(BUNDLES.combatContent, 'battle/animations/dangong/nu_lan', sp.SkeletonData, undefined, 'critical'),
-            res.load(BUNDLES.combatContent, 'battle/animations/dangong/nu_hong', sp.SkeletonData, undefined, 'critical'),
+            res.load(BUNDLES.combatShared, 'battle/animations/dangong/nu_lan', sp.SkeletonData, undefined, 'critical'),
+            res.load(BUNDLES.combatShared, 'battle/animations/dangong/nu_hong', sp.SkeletonData, undefined, 'critical'),
         ]);
         active();
         const effects = await Promise.all([
-            res.load(BUNDLES.combatContent, 'battle/animations/pengzhuang/zhuanjihuohua', sp.SkeletonData, undefined, 'normal'),
-            res.load(BUNDLES.combatContent, 'battle/animations/zengbing/hu_hong_lan_tx', sp.SkeletonData, undefined, 'normal'),
+            res.load(BUNDLES.combatShared, 'battle/animations/pengzhuang/zhuanjihuohua', sp.SkeletonData, undefined, 'normal'),
+            res.load(BUNDLES.combatShared, 'battle/animations/zengbing/hu_hong_lan_tx', sp.SkeletonData, undefined, 'normal'),
         ]);
         active();
         [this.collision, this.reinforcement] = effects;
@@ -70,7 +72,8 @@ export class TroopAssets {
         this.reinforcementDuration = this.reinforcement.getRuntimeData()?.findAnimation('luodi')?.duration ?? 0;
         if (!(this.collisionDuration > 0) || !(this.reinforcementDuration > 0)) throw new Error('碰撞或增兵特效动画缺失');
         await Promise.all(heroes.map(async id => {
-            const data = await res.load(BUNDLES.combatContent, TROOP_PATHS[id]!, sp.SkeletonData, undefined, 'critical');
+            const path = TROOP_PATHS[id]!;
+            const data = await res.load(combatBundleForAssetPath(path), path, sp.SkeletonData, undefined, 'critical');
             active();
             const animations = (data.skeletonJson as any)?.animations;
             for (const clip of ['idle', 'walk', 'attack']) {
@@ -81,7 +84,7 @@ export class TroopAssets {
         await Promise.all(heroes.map(async id => {
             const path = HERO_MELEE_EFFECTS[id] ?? HERO_RANGED_ART[id]?.path;
             if (!path) return;
-            const data = await res.load(BUNDLES.combatContent, path, sp.SkeletonData, undefined, 'normal'); active();
+            const data = await res.load(combatBundleForAssetPath(path), path, sp.SkeletonData, undefined, 'normal'); active();
             if (!data.getRuntimeData()?.findAnimation('attack')) throw new Error(`英雄攻击特效缺失：${id}/attack`);
             if (HERO_RANGED_ART[id]?.impact === 'hit' && !data.getRuntimeData()?.findAnimation('hit'))
                 throw new Error(`英雄命中特效缺失：${id}/hit`);
@@ -92,17 +95,17 @@ export class TroopAssets {
             const attack = rangedAttack(id); if (attack && !HERO_RANGED_ART[id]) kinds.add(attack.kind);
         }
         await Promise.all(Array.from(kinds).map(async kind => {
-            const data = await res.load(BUNDLES.combatContent, `heroes/animations/batched/${kind}`, sp.SkeletonData, undefined, 'normal');
+            const data = await res.load(BUNDLES.combatShared, `heroes/animations/batched/${kind}`, sp.SkeletonData, undefined, 'normal');
             active();
             if (!(data.skeletonJson as any)?.animations?.attack) throw new Error(`弹体动画缺失：${kind}/attack`);
             this.projectiles.set(kind, data);
         }));
-        this.death = await res.load(BUNDLES.combatContent, 'battle/animations/death/si_tongyong', sp.SkeletonData, undefined, 'background');
+        this.death = await res.load(BUNDLES.combatShared, 'battle/animations/death/si_tongyong', sp.SkeletonData, undefined, 'background');
         active();
         if (!(this.death.skeletonJson as any)?.animations?.animation) throw new Error('死亡动画缺失：si_tongyong/animation');
         this.deathDuration = this.death.getRuntimeData()?.findAnimation('animation')?.duration ?? 0;
         if (!(this.deathDuration > 0)) throw new Error('死亡动画时长无效：si_tongyong/animation');
-        const effect = await res.load(BUNDLES.battle, 'materials/troop-outline', EffectAsset, undefined, 'normal');
+        const effect = await res.load(BUNDLES.battleRuntime, 'materials/troop-outline', EffectAsset, undefined, 'normal');
         active();
         const sharedMaterials = new Map<string, Material>();
         for (const id of heroes) {
@@ -118,7 +121,7 @@ export class TroopAssets {
             this.outlineMaterials.add(material);
             sharedMaterials.set(texture.uuid, material);
         }
-        const batchEffect = await res.load(BUNDLES.battle, 'materials/troop-multitexture', EffectAsset, undefined, 'background');
+        const batchEffect = await res.load(BUNDLES.battleRuntime, 'materials/troop-multitexture', EffectAsset, undefined, 'background');
         active();
         this.batchRenderer = new SpineBatchRenderer(batchEffect, skeleton => {
             if (!skeleton.customMaterial) return 0;

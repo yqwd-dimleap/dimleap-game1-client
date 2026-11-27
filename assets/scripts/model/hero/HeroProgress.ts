@@ -51,8 +51,8 @@ export function heroCardState(id: HeroId, entry: HeroProgress, unlocked = entry.
         ready: unlocked ? !max && entry.shards >= required : entry.shards >= required,
         progress: required > 0 ? Math.max(0, Math.min(1, entry.shards / required)) : 1 };
 }
-export function deploymentTroopCount(token: Deployment, zones: readonly Zone[] = ZONES): number {
-    return heroStats(token.hero, token.level).count + bonusAt(token, zones);
+export function deploymentTroopCount(token: Deployment, zones: readonly Zone[] = ZONES, radius = 0, minOverlap = 0): number {
+    return heroStats(token.hero, token.level).count + bonusAt(token, zones, radius, minOverlap);
 }
 function defaults(): HeroProfile {
     const heroes = {} as Record<HeroId, HeroProgress>;
@@ -136,6 +136,23 @@ export class HeroProgressStore {
             catch (error) { return { ok: false, message: `阵容保存失败：${String(error)}` }; }
         }
         return this.commit(next, `${HEROES[id].name} 已加入 ${index + 1} 号位`);
+    }
+    async place(id: HeroId, index: number): Promise<ProgressResult> {
+        if (!HERO_IDS.includes(id)) return { ok: false, message: '未知英雄' };
+        if (!Number.isInteger(index) || index < 0 || index >= 5) return { ok: false, message: '无效的阵容位置' };
+        if (!this.value.heroes[id].unlocked) return { ok: false, message: '该英雄尚未解锁' };
+        const next = this.snapshot();
+        const source = next.lineup.indexOf(id);
+        if (source === index) return { ok: true, message: `${HEROES[id].name} 已在 ${index + 1} 号位` };
+        const replaced = next.lineup[index];
+        next.lineup[index] = id;
+        if (source >= 0) next.lineup[source] = replaced;
+        if (this.remote) {
+            try { await this.remote.saveLineup(next.lineup); }
+            catch (error) { return { ok: false, message: `阵容保存失败：${String(error)}` }; }
+        }
+        const action = replaced ? `替换了${HEROES[replaced].name}` : '已上阵';
+        return this.commit(next, `${HEROES[id].name} ${action} · ${index + 1} 号位`);
     }
     async remove(id: HeroId): Promise<ProgressResult> {
         const next = this.snapshot(), index = next.lineup.indexOf(id);

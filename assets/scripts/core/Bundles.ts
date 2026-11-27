@@ -2,12 +2,12 @@
 export const BUNDLES = {
     ui: 'ui_bundle',
     settings: 'settings_ui',
-    tutorial: 'tutorial_bundle',
     heroes: 'heroes_bundle',
-    battle: 'battle_bundle',
-    battleUi: 'battle_ui_bundle',
+    battleRuntime: 'battle_runtime',
+    battlePresentation: 'battle_presentation',
     map: 'map_bundle',
-    combatContent: 'combat_content',
+    combatShared: 'combat_shared',
+    combatHeroes: 'combat_heroes',
     seasonContent: 'season_content',
 } as const;
 

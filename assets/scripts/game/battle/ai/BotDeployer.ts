@@ -17,8 +17,10 @@ export function planBotShot(start: Point, tokens: Deployment[], available: HeroI
     if (!available.length) throw new Error('Bot has no affordable cards');
     const targets = [
         ...zones.map(z => ({ x: z.x, y: z.y, value: (z.bonus * 4 + 4) * (difficulty?.bonus_zone_weight ?? 1), attack: false, reason: `争夺 +${z.bonus} 区` })),
-        ...tokens.filter(t => t.team !== team && bonusAt(t, zones) > 0).map(t => ({ x: t.x, y: t.y,
-            value: (bonusAt(t, zones) * 5 + 5) * (difficulty?.displace_enemy_weight ?? 1), attack: true, reason: '撞开敌方占区 Token' })),
+        ...tokens.filter(t => t.team !== team && bonusAt(t, zones, RULES.tokenRadius, RULES.zoneContactDepth) > 0)
+            .map(t => ({ x: t.x, y: t.y,
+                value: (bonusAt(t, zones, RULES.tokenRadius, RULES.zoneContactDepth) * 5 + 5) *
+                    (difficulty?.displace_enemy_weight ?? 1), attack: true, reason: '撞开敌方占区 Token' })),
         { x: RULES.centerX, y: RULES.centerY, value: -100, attack: false, reason: '向场内安全部署' },
     ];
     const b = arenaEdges(RULES.tokenRadius), sign = team === 0 ? 1 : -1;
@@ -45,7 +47,9 @@ export function planBotShot(start: Point, tokens: Deployment[], available: HeroI
                 // Approximate obstructions; full token-contact prediction remains Box2D's job.
                 const progress = ((token.x - origin.x) * dx + (token.y - origin.y) * dy) / (length * length);
                 if (progress > .05 && progress < .9 && distance(token, { x: origin.x + progress * dx, y: origin.y + progress * dy }) < 90)
-                    score += token.team === team ? -10 : (bonusAt(token, zones) > 0 ? 2 : -3);
+                    score += token.team === team
+                        ? -10
+                        : (bonusAt(token, zones, RULES.tokenRadius, RULES.zoneContactDepth) > 0 ? 2 : -3);
             }
             if (tokens.some(t => t.team === team && distance(t, target) < 90)) score -= 9;
             if (score > bestScore) {

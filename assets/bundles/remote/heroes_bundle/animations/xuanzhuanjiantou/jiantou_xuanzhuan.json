@@ -1,0 +1,35 @@
+{
+"skeleton": { "hash": "T4CJ5qOOyFE", "spine": "4.2.43", "x": -25, "y": -26, "width": 50, "height": 52 },
+"bones": [
+	{ "name": "root" },
+	{ "name": "bone", "parent": "root" }
+],
+"slots": [
+	{ "name": "xuanzhuanjiantou", "bone": "bone", "attachment": "xuanzhuanjiantou" }
+],
+"skins": [
+	{
+		"name": "default",
+		"attachments": {
+			"xuanzhuanjiantou": {
+				"xuanzhuanjiantou": { "width": 50, "height": 52 }
+			}
+		}
+	}
+],
+"animations": {
+	"animation": {
+		"bones": {
+			"bone": {
+				"rotate": [
+					{},
+					{ "time": 0.5, "value": -90.07 },
+					{ "time": 1, "value": -180.29 },
+					{ "time": 1.5, "value": -270.03 },
+					{ "time": 2, "value": -359.87 }
+				]
+			}
+		}
+	}
+}
+}

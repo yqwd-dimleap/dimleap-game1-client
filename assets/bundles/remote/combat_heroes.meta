@@ -1,0 +1,14 @@
+{
+  "ver": "1.2.0",
+  "importer": "directory",
+  "imported": true,
+  "uuid": "e9c4db66-2e7a-479b-9f06-ffd8fe3a0d55",
+  "files": [],
+  "subMetas": {},
+  "userData": {
+    "isBundle": true,
+    "bundleName": "combat_heroes",
+    "priority": 4,
+    "bundleConfigID": "remote-content"
+  }
+}
