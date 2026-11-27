@@ -219,7 +219,7 @@ export class MatchController extends Component {
                 displace_enemy_weight: difficulty.displaceEnemyWeight,
             });
             const match = app.battleMatch ?? (app.battleMatch = createBattleMatch(Math.random, Date.now(), app.profile));
-            if (tutorialBattle) match.red = { nickname: '新手训练师', avatar: 1 };
+            if (tutorialBattle) match.red = { nickname: '新手训练师', avatar: 2 };
             const mapDefinition = battleMapById(tutorialBattle ? 'map_1_1' : cloudBattle.map.mapId);
             const [mapPrefab, highlightEffect] = await Promise.all([
                 resources.load(mapDefinition.bundle, mapDefinition.path, Prefab, undefined, 'critical'),
@@ -308,7 +308,8 @@ export class MatchController extends Component {
             this.world.slingshot(1).bind(this.troopAssets.launchers[1]);
             this.arrows = new ArrowProjectiles(this.world.effects, arrowPrefab, this.troopAssets);
             this.deploymentFx = new DeploymentEffects(this.world.effects, this.troopAssets);
-            this.hud.initialize(match, () => { void this.openBattlePause(); }, winner => this.forceRoundWinner(winner));
+            this.hud.initialize(match, () => { void this.openBattlePause(); },
+                winner => this.forceRoundWinner(winner), !tutorialBattle);
             const hud = this.hud.node;
             const handRoot = instantiate(handPrefab); this.setUILayer(handRoot); hud.addChild(handRoot);
             this.hand = handRoot.getComponent(BattleHandPanel) ?? undefined;
@@ -381,7 +382,11 @@ export class MatchController extends Component {
             this.troopAssets.destroy();
             console.error('[Prototype] startup failed', error);
             this.matching?.fail(error);
-            if (this.hud) { this.hud.initialize(GameApp.instance.battleMatch ?? createBattleMatch(), () => { void this.returnHome(); }); this.hud.node.active = true; this.label('status', `启动失败：${String(error)}`); }
+            if (this.hud) {
+                this.hud.initialize(GameApp.instance.battleMatch ?? createBattleMatch(),
+                    () => { void this.returnHome(); }, undefined, !GameApp.instance.isTutorialBattle);
+                this.hud.node.active = true; this.label('status', `启动失败：${String(error)}`);
+            }
         }
     }
 
@@ -407,7 +412,7 @@ export class MatchController extends Component {
     }
 
     private async openBattlePause(): Promise<void> {
-        if (!this.loaded || this.leaving || this.session.phase === 'result') return;
+        if (GameApp.instance.isTutorialBattle || !this.loaded || this.leaving || this.session.phase === 'result') return;
         this.hud.status('正在加载暂停界面…');
         try {
             const view = await this.withPresentationTimeout(

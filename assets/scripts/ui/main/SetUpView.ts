@@ -7,8 +7,9 @@ import { avatarPath, PLAYER_UI_BUNDLE } from '../common/PlayerUIAssets';
 @_decorator.ccclass('SetUpView')
 export class SetUpView extends UIBase {
     private revision = 0;
-    initialize(close: () => void, avatar: () => void, nickname: () => void): void {
+    initialize(close: () => void, avatar: () => void, nickname: () => void, remoteVersion: string): void {
         this.bindUI();
+        this.ui.at('bg/version_value', Label).string = `v${remoteVersion}`;
         this.click('bg/btn_close', close);
         this.click('bg/btn_avatar_frame', avatar);
         this.click('bg/btn_modify', nickname);

@@ -26,12 +26,13 @@ export class BattleHUDView extends Component {
     private pauseNode?: Node;
     get introReady(): boolean { return !this.introRunning; }
     private get nodes(): ViewNodes { return this.ui ?? (this.ui = new ViewNodes(this.node)); }
-    initialize(match: BattleMatch, onPause: () => void, forceWinner?: (winner: Team) => void): void {
+    initialize(match: BattleMatch, onPause: () => void, forceWinner?: (winner: Team) => void, allowPause = true): void {
         this.dispose(); this.onPause = onPause;
         this.forceWinner = forceWinner;
         this.pauseNode = this.node.getChildByName('btn_pause') ?? this.node.getChildByName('Button') ?? undefined;
         if (!this.pauseNode?.getComponent(Button)) throw new Error('BattleHUD requires btn_pause or Button');
-        this.pauseNode.on(Button.EventType.CLICK, onPause);
+        this.pauseNode.active = allowPause;
+        if (allowPause) this.pauseNode.on(Button.EventType.CLICK, onPause);
         this.roundTurnBanner = this.nodes.at('round_1_ani', sp.Skeleton);
         this.turnBanner = this.nodes.at('round_2_ani', sp.Skeleton);
         this.roundTurnBanner.node.active = false;

@@ -39,7 +39,7 @@ export class PlayerSettingsController {
                 const view = node.getComponent(SetUpView);
                 if (!view) throw new Error('SetUpView requires SetUpView component');
                 view.initialize(close, () => { void this.openPage('AvatarSetUpView', entry); },
-                    () => { void this.openPage('NickNameModifyView', entry); });
+                    () => { void this.openPage('NickNameModifyView', entry); }, this.app.res.remoteVersion.activeVersion);
                 void view.renderPlayer(profile, entry.scope).catch(error => { if (!entry.closed) this.report(`头像加载失败：${String(error)}`); });
             } else if (page === 'AvatarSetUpView') {
                 const view = node.getComponent(AvatarSetUpView);
