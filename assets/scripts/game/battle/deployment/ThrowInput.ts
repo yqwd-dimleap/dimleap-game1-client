@@ -9,7 +9,8 @@ export class ThrowInput {
     constructor(private board: Node, private begin: (p: Point) => Point | null,
         private move: (dx: number, dy: number) => void,
         private end: (dx: number, dy: number) => void,
-        private cancelCallback: () => void, private camera?: Camera, surface?: Node) {
+        private cancelCallback: () => void, private camera?: Camera, surface?: Node,
+        private started?: () => void) {
         this.transform = board.getComponent(UITransform)!;
         // Capture on the full view: pulling beyond the board must still release a shot.
         this.surface = surface ?? board.parent!;
@@ -33,6 +34,7 @@ export class ThrowInput {
         const origin = this.begin(this.point(e));
         if (!origin) return;
         this.origin = origin; this.touchId = e.getID();
+        this.started?.();
     }
     private onMove(e: EventTouch): void {
         if (e.getID() !== this.touchId || !this.origin) return;
