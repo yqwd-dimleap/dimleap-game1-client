@@ -1,5 +1,10 @@
 export type PlatformKind = 'web' | 'wx' | 'tt';
-export interface HttpOptions { method: 'GET' | 'POST' | 'PUT' | 'PATCH'; body?: unknown; headers?: Record<string, string> }
+export interface HttpOptions {
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH';
+    body?: unknown;
+    headers?: Record<string, string>;
+    timeoutMs?: number;
+}
 export class PlatformRequestError extends Error {
     constructor(readonly statusCode: number, readonly response: unknown) {
         super(`HTTP ${statusCode}`);
@@ -27,7 +32,7 @@ export abstract class MiniGamePlatform implements Platform {
     }
     request<T>(url: string, options: HttpOptions): Promise<T> {
         return new Promise<T>((resolve, reject) => this.host.request({ url, method: options.method, data: options.body,
-            header: { 'content-type': 'application/json', ...options.headers }, timeout: 15000,
+            header: { 'content-type': 'application/json', ...options.headers }, timeout: options.timeoutMs ?? 15000,
             success: response => response.statusCode >= 200 && response.statusCode < 300
                 ? resolve(response.data as T) : reject(new PlatformRequestError(response.statusCode, response.data)), fail: reject }));
     }

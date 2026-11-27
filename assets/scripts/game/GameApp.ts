@@ -79,7 +79,8 @@ export class GameApp {
             const asset = await new Promise<JsonAsset>((resolve, reject) => resources.load('config/app', JsonAsset,
                 (error, value) => error ? reject(error) : resolve(value)));
             this.config = parseConfig(asset.json);
-            this.res = new Res(this.config, this.platform.kind);
+            this.res = new Res(this.config, this.platform, sys.localStorage);
+            await this.res.initialize();
             this.api = new Api(this.platform, resolveApiBaseUrl(this.config));
             this.cloud = new CloudClient(this.api, this.platform);
             const rows = await Promise.all(GAME_TABLE_NAMES.map(async name => {
@@ -146,6 +147,7 @@ export class GameApp {
                             battle: this.tutorialBattle,
                         },
                         configVersion: this.configVersion,
+                        remoteVersion: this.res.remoteVersion,
                     }),
                     resetTutorial: () => this.tutorial.reset(),
                 };

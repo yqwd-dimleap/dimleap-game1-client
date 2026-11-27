@@ -12,13 +12,18 @@ export interface AppConfig {
     /** Loopback API used only by editor Game View and browser preview; empty disables the override. */
     devApiBaseUrl?: string;
     remoteBaseUrl: { web: string; wx: string; tt: string };
+    /** Package-owned fallback when the remote version manifest and its local cache are unavailable. */
+    remoteVersion: string;
     /** Runtime loading and build checks share this delivery manifest. */
     bundles: Record<string, BundleDefinition>;
 }
 export function parseConfig(value: unknown): AppConfig {
     const c = value as AppConfig;
-    if (!c || typeof c.version !== 'string' || typeof c.minimumClientVersion !== 'string' || typeof c.apiBaseUrl !== 'string' || !c.remoteBaseUrl)
+    if (!c || typeof c.version !== 'string' || typeof c.minimumClientVersion !== 'string' || typeof c.apiBaseUrl !== 'string' ||
+        !c.remoteBaseUrl || typeof c.remoteVersion !== 'string')
         throw new Error('Invalid bootstrap configuration');
+    if (!/^v?[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(c.remoteVersion))
+        throw new Error(`Invalid remote version: ${c.remoteVersion}`);
     for (const key of ['web', 'wx', 'tt'] as const) {
         const url = c.remoteBaseUrl[key];
         if (typeof url !== 'string' || (url && !/^https:\/\//.test(url))) throw new Error(`Invalid CDN URL: ${key}`);

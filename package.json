@@ -16,6 +16,10 @@
     "check:boundaries": "node tools/verify-project.cjs",
     "stage:wx": "node tools/stage-release.cjs wx",
     "stage:tt": "node tools/stage-release.cjs tt",
+    "stage:remote": "node scripts/remote-release.cjs stage",
+    "activate:remote": "node scripts/remote-release.cjs activate",
+    "rollback:remote": "node scripts/remote-release.cjs rollback",
+    "verify:remote": "node scripts/remote-release.cjs verify",
     "check:prefabs": "node tools/check-prefabs.cjs",
     "check:maps": "node tools/check-maps.cjs"
   }

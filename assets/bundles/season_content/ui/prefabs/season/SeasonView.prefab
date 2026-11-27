@@ -358,7 +358,7 @@
   },
   {
     "__type__": "cc.Node",
-    "_name": "rank_title-001",
+    "_name": "rank_time",
     "_objFlags": 0,
     "__editorExtras__": {},
     "_parent": {
@@ -420,7 +420,7 @@
     },
     "_contentSize": {
       "__type__": "cc.Size",
-      "width": 205.37109375,
+      "width": 206.85546875,
       "height": 27.72
     },
     "_anchorPoint": {
@@ -456,7 +456,7 @@
       "b": 255,
       "a": 255
     },
-    "_string": "2026.12.05-2026.12.11",
+    "_string": "2026.12.04-2026.12.10",
     "_horizontalAlign": 1,
     "_verticalAlign": 1,
     "_actualFontSize": 20,
@@ -2815,7 +2815,7 @@
     },
     "_contentSize": {
       "__type__": "cc.Size",
-      "width": 749.9999999999999,
+      "width": 750,
       "height": 1334
     },
     "_anchorPoint": {

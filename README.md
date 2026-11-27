@@ -52,4 +52,37 @@ npm run stage:tt
 
 编辑器 Game View 与浏览器预览会自动改用 `app.json` 的 `devApiBaseUrl`（默认 `http://127.0.0.1:3000/api/v1`），真机构建和小游戏包始终使用 `apiBaseUrl`。预览需要连正式服时把 `devApiBaseUrl` 置空；该字段只接受 `127.0.0.1`/`localhost` 的 HTTP 地址。
 
+## 远程资源版本目录
+
+远程包使用不可变版本目录，禁止用新构建覆盖线上同名目录。CDN 结构如下：
+
+```text
+<cdn-root>/
+├─ config/remote_version.json
+├─ remote_v1.0.0/remote/<bundle>/
+├─ remote_v1.0.1/remote/<bundle>/
+└─ remote_v1.0.2/remote/<bundle>/
+```
+
+启动时 `RemoteVersionManager` 先拉取 `<platform-remote-base>/config/remote_version.json`，再让每个远程 Bundle 从 `remote_v<version>/remote/<bundle>/` 加载。清单按平台域名分别部署；`app.json` 的 `remoteVersion` 是首次安装、清单不可用且本地没有有效缓存时使用的主包兜底版本。
+
+每次发布新远程资源：
+
+```sh
+npm run stage:remote -- 1.0.1 --source build/wechatgame/remote
+npm run verify:remote
+```
+
+脚本会在 `release/` 生成新的 `remote_v1.0.1/remote/`、发布摘要和 `config/remote_version.json`。它拒绝覆盖已存在的版本目录。先上传整个新版本目录，再最后上传版本清单，避免玩家提前看到半成品。
+
+回滚只改版本清单，不删除或重传远程文件：
+
+```sh
+npm run rollback:remote -- 1.0.0
+```
+
+上传新的 `config/remote_version.json` 并刷新该 URL 的 CDN 缓存后，玩家下次冷启动会读取旧目录；已经进入游戏的玩家继续使用当前内存中的版本。建议保留最近 2～3 个版本目录。`remote_version.json` 应设置 `Cache-Control: no-cache`，版本目录中的资源可长期缓存；构建必须保持 `md5Cache: true`。微信与抖音后台都需配置 CDN 的 request/downloadFile 合法域名，COS 还需允许远程 Bundle 的跨域读取。
+
+版本清单支持 `bundles` 单独指定某些 Bundle 的目录，也预留了 `next` + `gray_percent` 设备稳定灰度。正常回滚直接修改 `current`，不要依赖 `rollback_to` 长期覆盖。
+
 `verify` 检查 Bundle 元数据与清单、优先级、依赖方向/循环、跨包静态引用、脚本层依赖、动态资源路径、启动资源边界、远程包禁用脚本、空目录/临时文件和 Prefab 内部 ID。`check-maps` 检查 25 张地图清单、路径、ID 和 Prefab 文件集合是否一致；`check-prefabs` 检查 Prefab JSON、`.meta` 和组件 `fileId` 唯一性。

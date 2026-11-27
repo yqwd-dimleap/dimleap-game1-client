@@ -4,6 +4,7 @@
   "apiBaseUrl": "https://api.0ygame.cn/api/v1",
   "devApiBaseUrl": "",
   "remoteBaseUrl": { "web": "https://0ygame.cn", "wx": "https://gameweb.0ygame.cn", "tt": "" },
+  "remoteVersion": "1.0.0",
   "bundles": {
     "ui_bundle": { "delivery": "subpackage", "priority": 6, "dependencies": [] },
     "settings_ui": { "delivery": "remote", "priority": 4, "dependencies": ["ui_bundle"] },

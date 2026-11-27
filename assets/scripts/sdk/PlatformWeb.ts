@@ -4,7 +4,7 @@ export class PlatformWeb implements Platform {
     login(): Promise<{ code: string }> { return Promise.reject(new Error('浏览器原型使用本地游客，无平台登录凭证')); }
     async request<T>(url: string, options: HttpOptions): Promise<T> {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15000);
+        const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 15000);
         try {
             const response = await fetch(url, { method: options.method, signal: controller.signal,
                 headers: { 'content-type': 'application/json', ...options.headers },

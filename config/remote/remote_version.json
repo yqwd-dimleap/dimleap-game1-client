@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "current": "1.0.0",
+  "fallback": "1.0.0",
+  "previous": null,
+  "rollback_to": null,
+  "next": null,
+  "gray_percent": 0,
+  "force_restart": false,
+  "bundles": {
+    "settings_ui": "1.0.0",
+    "heroes_bundle": "1.0.0",
+    "map_bundle": "1.0.0",
+    "combat_content": "1.0.0",
+    "season_content": "1.0.0"
+  },
+  "updated_at": "2026-11-26T00:00:00.000Z"
+}
