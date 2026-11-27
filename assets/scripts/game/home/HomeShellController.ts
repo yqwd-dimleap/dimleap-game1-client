@@ -11,6 +11,7 @@ import { SeasonController } from '../season/SeasonController';
 import { ModalHost } from '../../ui/common/ModalHost';
 import { HOME_READY_EVENT } from '../StartupFlow';
 const { ccclass } = _decorator;
+const HERO_WAITING_MIN_MS = 1000;
 
 /** Scene owns the Canvas; the bundle owns the complete editable HomeView prefab. */
 @ccclass('HomeShellController')
@@ -85,9 +86,14 @@ export class HomeShellController extends Component {
         this.shell?.status('');
         this.shell?.navigationBusy(true);
         const waiting = (page === 'heroes' || page === 'season') && !this.router?.isLoaded(page);
+        const waitingStarted = waiting ? Date.now() : 0;
         if (waiting) this.shell?.setWaiting(true);
         try {
             const changed = await this.router?.show(page);
+            if (page === 'heroes' && waiting && changed) {
+                const remaining = HERO_WAITING_MIN_MS - (Date.now() - waitingStarted);
+                if (remaining > 0) await new Promise<void>(resolve => setTimeout(resolve, remaining));
+            }
             if (!isValid(this, true) || selection !== this.selection) return;
             if (changed) { this.shell?.selected(page); this.shell?.status(''); }
         } catch (error) {

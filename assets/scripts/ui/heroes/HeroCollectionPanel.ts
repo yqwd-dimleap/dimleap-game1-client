@@ -207,7 +207,7 @@ export class HeroCollectionPanel {
         }
     }
 
-    setVisualAssets(icons: (SpriteFrame | null)[], cardArt: HeroCardArt): void {
+    setVisualAssets(icons: (SpriteFrame | null)[], cardArt?: HeroCardArt): void {
         if (this.disposed) return;
         this.assets.icons = icons;
         this.assets.cardArt = cardArt;

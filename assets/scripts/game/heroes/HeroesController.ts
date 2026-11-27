@@ -37,10 +37,11 @@ export class HeroesController extends Component {
     async initialize(resources: ResourceScope, store: HeroProgressStore, modals: ModalPresenter): Promise<void> {
         this.resources = resources;
         this.modals = modals;
-        const [card, lineup, replace] = await Promise.all([
+        const [card, lineup, replace, presentation] = await Promise.all([
             resources.load(BUNDLES.heroes, 'prefabs/heroes/HeroCard', Prefab, undefined, 'critical'),
             resources.load(BUNDLES.heroes, 'prefabs/heroes/GoBattleHeroCard', Prefab, undefined, 'critical'),
             resources.load(BUNDLES.heroes, 'prefabs/heroes/HeroReplace', Prefab, undefined, 'normal'),
+            this.loadPresentation(resources),
         ]);
         if (this.disposed || !isValid(this, true)) throw new Error('Heroes page was destroyed while loading');
         const panel = this.panel = new HeroCollectionPanel(this.node, store, {
@@ -59,22 +60,34 @@ export class HeroesController extends Component {
                 return { select, detail, levelUp };
             },
         }, modals);
+        panel.setVisualAssets(presentation.icons, presentation.cardArt);
         const heroGMButton = this.node.getChildByName('btn_hero_gm');
         if (heroGMButton) heroGMButton.active = false;
         if (GM_VISIBLE) console.warn('[Heroes] HeroBattleGM is excluded from production bundles');
-        // The authored page and default card art are already visible. Load portraits,
-        // tier art and interaction overlays after the first frame, off the entry path.
+        // Interaction overlays are secondary to the visible roster and stay off the entry path.
         this.scheduleOnce(() => {
             if (this.disposed || this.panel !== panel) return;
-            void Promise.all([
-                Promise.all(DEPLOYABLE_HERO_IDS.map(id =>
-                    HERO_ICON_PATHS[id] ? resources.load(BUNDLES.heroes, HERO_ICON_PATHS[id]!, SpriteFrame, undefined, 'background') : Promise.resolve(null))),
-                this.loadCardArt(resources),
-            ]).then(([icons, cardArt]) => {
-                if (!this.disposed && this.panel === panel) panel.setVisualAssets(icons, cardArt);
-            }).catch(error => console.warn('[Heroes] optional card art load failed:', error));
             void panel.warmOverlays().catch(error => console.warn('[Heroes] optional interaction UI load failed:', error));
         }, 0);
+    }
+    private async loadPresentation(resources: ResourceScope): Promise<{ icons: (SpriteFrame | null)[]; cardArt?: HeroCardArt }> {
+        const icons = await Promise.all(DEPLOYABLE_HERO_IDS.map(async id => {
+            const path = HERO_ICON_PATHS[id];
+            if (!path) return null;
+            try {
+                return await resources.load(BUNDLES.heroes, path, SpriteFrame, undefined, 'background');
+            } catch (error) {
+                console.warn(`[Heroes] portrait failed for ${id}:`, error);
+                return null;
+            }
+        }));
+        let cardArt: HeroCardArt | undefined;
+        try {
+            cardArt = await this.loadCardArt(resources);
+        } catch (error) {
+            console.warn('[Heroes] optional card art load failed:', error);
+        }
+        return { icons, cardArt };
     }
     private async loadCardArt(resources: ResourceScope): Promise<HeroCardArt> {
         const [frames, levels, names] = await Promise.all([
