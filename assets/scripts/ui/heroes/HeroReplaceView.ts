@@ -9,18 +9,20 @@ interface ReplaceSlot {
     replace: sp.Skeleton;
 }
 
-const SLOT_HOVER_PADDING_X = 4;
-const SLOT_HOVER_PADDING_Y = 8;
+const LINEUP_HOVER_PADDING_X = 12;
+const LINEUP_HOVER_PADDING_Y = 8;
 const FOLLOW_OFFSET_Y = 48;
-const SLOT_HERO_SIZE = { width: 104, height: 126 } as const;
-const SELECTED_HERO_SIZE = { width: 118, height: 138 } as const;
+const SLOT_HERO_SIZE = { width: 170, height: 118 } as const;
+const SELECTED_HERO_SIZE = { width: 185, height: 130 } as const;
 
 /** Drives the authored HeroReplace prefab without owning progression data. */
 @_decorator.ccclass('HeroReplaceView')
 export class HeroReplaceView extends Component {
     private slots: ReplaceSlot[] = [];
+    private lineup!: Node;
     private selectedRoot!: Node;
     private selectedHero!: sp.Skeleton;
+    private selectedOffset = new Vec3();
     private dragArrow!: sp.Skeleton;
     private loadHero?: (id: HeroId) => Promise<sp.SkeletonData>;
     private selectedId?: HeroId;
@@ -32,16 +34,18 @@ export class HeroReplaceView extends Component {
     initialize(loadHero: (id: HeroId) => Promise<sp.SkeletonData>): void {
         this.dispose();
         this.loadHero = loadHero;
+        this.lineup = this.required('shangzhen_node');
         this.slots = Array.from({ length: 5 }, (_, index) => {
             const number = index + 1;
             const root = this.required(`shangzhen_node/Lineup${number}`);
-            const highlight = root.getChildByName('select_hightlight');
+            const highlight = root.getChildByName(`hightlight_${number}`)
+                ?? root.getChildByName('select_hightlight');
             const hero = this.required(`shangzhen_node/Lineup${number}/hero_ani_${number}`).getComponent(sp.Skeleton)!;
             const point = this.required(`shangzhen_node/Lineup${number}/point_ani_${number}`).getComponent(sp.Skeleton)!;
             const replace = this.required(`shangzhen_node/Lineup${number}/replace_ani_${number}`).getComponent(sp.Skeleton)!;
             point.setAnimation(0, 'animation', true);
             replace.setAnimation(0, 'animation', true);
-            if (highlight) highlight.active = false;
+            if (highlight) highlight.active = true;
             return { root, highlight: highlight ?? undefined, hero, point, replace };
         });
         const selectedNode = this.node.getChildByName('selected_hero_ani')
@@ -60,12 +64,13 @@ export class HeroReplaceView extends Component {
         this.source.set(source);
         this.pointer.set(pointer);
         this.hovered = -1;
+        this.selectedOffset.set(0, 0, 0);
         this.selectedRoot.active = true;
         this.selectedHero.node.active = false;
         this.selectedHero.skeletonData = null;
         this.playDragArrow();
         this.slots.forEach((slot, index) => {
-            if (slot.highlight) slot.highlight.active = false;
+            if (slot.highlight) slot.highlight.active = true;
             slot.hero.skeletonData = null;
             slot.hero.node.active = false;
             slot.point.node.active = true;
@@ -75,6 +80,7 @@ export class HeroReplaceView extends Component {
         });
         this.loadInto(this.selectedHero, id, SELECTED_HERO_SIZE, request);
         this.updatePointer(pointer);
+        this.positionDragArrowAtSource();
     }
 
     moveTo(pointer: Vec3): void {
@@ -94,9 +100,10 @@ export class HeroReplaceView extends Component {
         this.selectedRoot.active = false;
         this.selectedHero.skeletonData = null;
         this.selectedHero.node.active = false;
+        this.selectedOffset.set(0, 0, 0);
         this.hideDragArrow();
         for (const slot of this.slots) {
-            if (slot.highlight) slot.highlight.active = false;
+            if (slot.highlight) slot.highlight.active = true;
             slot.hero.skeletonData = null;
             slot.hero.node.active = false;
             slot.point.node.active = true;
@@ -113,23 +120,26 @@ export class HeroReplaceView extends Component {
         const transform = this.selectedRoot.parent?.getComponent(UITransform);
         if (!transform) return;
         const display = transform.convertToNodeSpaceAR(target);
-        const source = transform.convertToNodeSpaceAR(this.source);
-        this.selectedRoot.setPosition(display);
-        this.dragArrow.node.setPosition(source.x - display.x, source.y - display.y, 0);
+        this.selectedRoot.setPosition(display.x + this.selectedOffset.x, display.y + this.selectedOffset.y, 0);
+    }
+
+    private positionDragArrowAtSource(): void {
+        const transform = this.selectedRoot.parent?.getComponent(UITransform);
+        if (!transform) return;
+        this.dragArrow.node.setPosition(transform.convertToNodeSpaceAR(this.source));
     }
 
     private slotAt(pointer: Vec3): number {
-        let best = -1, bestScore = Number.POSITIVE_INFINITY;
-        for (let index = 0; index < this.slots.length; index++) {
-            const slot = this.slots[index];
-            const transform = slot.root.getComponent(UITransform);
-            if (!transform) continue;
-            const local = transform.convertToNodeSpaceAR(pointer);
-            const score = Math.max(
-                Math.abs(local.x) / (transform.width / 2 + SLOT_HOVER_PADDING_X),
-                Math.abs(local.y) / (transform.height / 2 + SLOT_HOVER_PADDING_Y));
-            if (score <= 1 && score < bestScore) { best = index; bestScore = score; }
-        }
+        const transform = this.lineup.getComponent(UITransform);
+        if (!transform) return -1;
+        const local = transform.convertToNodeSpaceAR(pointer);
+        if (Math.abs(local.x) > transform.width / 2 + LINEUP_HOVER_PADDING_X
+            || Math.abs(local.y) > transform.height / 2 + LINEUP_HOVER_PADDING_Y) return -1;
+        let best = -1, bestDistance = Number.POSITIVE_INFINITY;
+        this.slots.forEach((slot, index) => {
+            const dx = Math.abs(slot.root.worldPosition.x - pointer.x);
+            if (dx < bestDistance) { best = index; bestDistance = dx; }
+        });
         return best;
     }
 
@@ -138,7 +148,7 @@ export class HeroReplaceView extends Component {
         this.hovered = index;
         this.slots.forEach((slot, slotIndex) => {
             const selected = slotIndex === index;
-            if (slot.highlight) slot.highlight.active = selected;
+            if (slot.highlight) slot.highlight.active = true;
             slot.point.node.active = !selected;
             slot.replace.node.active = selected;
             if (selected) slot.replace.setAnimation(0, 'animation', true);
@@ -170,22 +180,65 @@ export class HeroReplaceView extends Component {
             const data = await this.loadHero?.(id);
             if (!data || request !== this.request || !isValid(skeleton, true)) return;
             skeleton.skeletonData = data;
-            this.fit(skeleton, data, size);
+            const offset = this.fit(skeleton, data, size);
+            if (skeleton === this.selectedHero) {
+                this.selectedOffset.set(offset);
+                this.updatePointer(this.pointer);
+            } else {
+                skeleton.node.setPosition(offset);
+            }
             skeleton.node.active = true;
             skeleton.setAnimation(0, data.getRuntimeData()?.findAnimation('idle') ? 'idle' : 'attack', true);
+            this.scheduleOnce(() => this.fitToRenderedBounds(skeleton, size, request), 0);
         } catch (error) {
             console.warn(`[HeroReplace] ${id} spine load failed`, error);
         }
     }
 
-    private fit(skeleton: sp.Skeleton, data: sp.SkeletonData, size: { width: number; height: number }): void {
+    private fitToRenderedBounds(
+        skeleton: sp.Skeleton,
+        size: { width: number; height: number },
+        request: number,
+    ): void {
+        if (request !== this.request || !isValid(skeleton, true) || !skeleton.node.activeInHierarchy) return;
+        const renderData = (skeleton as any).renderData ?? (skeleton as any)._renderData;
+        const buffer = renderData?.chunk?.vb as Float32Array | undefined;
+        const vertexCount = Number(renderData?.vertexCount ?? 0);
+        const floatStride = Number(renderData?.floatStride ?? 0);
+        if (!buffer || vertexCount < 2 || !(floatStride >= 2)) return;
+        let minX = Number.POSITIVE_INFINITY, minY = Number.POSITIVE_INFINITY;
+        let maxX = Number.NEGATIVE_INFINITY, maxY = Number.NEGATIVE_INFINITY;
+        for (let index = 0; index < vertexCount; index++) {
+            const offset = index * floatStride;
+            const x = buffer[offset], y = buffer[offset + 1];
+            if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+            minX = Math.min(minX, x); minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+        }
+        const width = maxX - minX, height = maxY - minY;
+        if (!(width > 0) || !(height > 0)) return;
+        const scale = Math.min(size.width / width, size.height / height);
+        const offset = new Vec3(-(minX + maxX) * .5 * scale, -(minY + maxY) * .5 * scale, 0);
+        skeleton.node.setScale(scale, scale, 1);
+        if (skeleton === this.selectedHero) {
+            this.selectedOffset.set(offset);
+            this.updatePointer(this.pointer);
+        } else {
+            skeleton.node.setPosition(offset);
+        }
+    }
+
+    private fit(skeleton: sp.Skeleton, data: sp.SkeletonData, size: { width: number; height: number }): Vec3 {
         const header = (data.skeletonJson as any)?.skeleton;
         const width = Number(header?.width), height = Number(header?.height);
-        if (!(width > 0) || !(height > 0)) { skeleton.node.setScale(.6, .6, 1); return; }
+        if (!(width > 0) || !(height > 0)) {
+            skeleton.node.setScale(.6, .6, 1);
+            return new Vec3();
+        }
         const scale = Math.min(size.width / width, size.height / height);
         const x = Number(header.x), y = Number(header.y);
         skeleton.node.setScale(scale, scale, 1);
-        skeleton.node.setPosition(-(x + width / 2) * scale, -(y + height / 2) * scale, 0);
+        return new Vec3(-(x + width / 2) * scale, -(y + height / 2) * scale, 0);
     }
 
     private required(path: string): Node {
@@ -203,6 +256,7 @@ export class HeroReplaceView extends Component {
         this.selectedHero = undefined!;
         this.dragArrow = undefined!;
         this.slots = [];
+        this.lineup = undefined!;
         this.hovered = -1;
     }
 

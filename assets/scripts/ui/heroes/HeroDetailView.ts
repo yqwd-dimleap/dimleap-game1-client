@@ -1,8 +1,11 @@
 import { ViewNodes } from '../binding/ViewNodes';
 import { GameTables } from '../../model/config/GameTables';
-import { _decorator, Button, Component, isValid, Label, ProgressBar, sp } from 'cc';
+import { _decorator, Button, Color, Component, isValid, Label, ProgressBar, Sprite, sp } from 'cc';
 import type { HeroDefinition } from '../../model/config/PrototypeConfig';
 import { HeroProgress, heroStats, heroGrowth, heroCardState, upgradeCost, unlockCost } from '../../model/hero/HeroProgress';
+
+const ENABLED_COLOR = new Color(255, 255, 255, 255);
+const DISABLED_COLOR = new Color(145, 145, 145, 255);
 
 @_decorator.ccclass('HeroDetailView')
 export class HeroDetailView extends Component {
@@ -54,9 +57,10 @@ export class HeroDetailView extends Component {
             : `碎片 ${entry.shards}/${max ? '—' : cost.shards}  ·  金币 ${coins}${max ? '' : `/${cost.coins}`}`);
         this.text('bg/Status', message);
         this.text('bg/btn_upgrade/Label', locked ? '解锁' : max ? '已满级' : '升级');
-        this.ui.at('bg/btn_upgrade', Button).interactable = locked
+        const canUpgrade = locked
             ? entry.shards >= unlockFragments
             : !max && entry.shards >= cost.shards && coins >= cost.coins;
+        this.setUpgradeButtonState(canUpgrade);
     }
     async loadPreview(load: () => Promise<sp.SkeletonData>): Promise<void> {
         const request = ++this.previewRequest;
@@ -74,6 +78,15 @@ export class HeroDetailView extends Component {
         }
     }
     private text(path: string, value: string): void { this.ui.at(path, Label).string = value; }
+    private setUpgradeButtonState(enabled: boolean): void {
+        const button = this.ui.at('bg/btn_upgrade', Button);
+        button.interactable = enabled;
+        const color = enabled ? ENABLED_COLOR : DISABLED_COLOR;
+        this.ui.at('bg/btn_upgrade', Sprite).color = color;
+        this.ui.at('bg/btn_upgrade/Label', Label).color = color;
+        this.ui.at('bg/btn_upgrade/gold_icon', Sprite).color = color;
+        this.ui.at('bg/btn_upgrade/upgrade_gold', Label).color = color;
+    }
     private statItemPath(index: number): string { return `bg/bg3/item_${index}`; }
     private statValuePath(index: number): string {
         return index <= 2 ? `${this.statItemPath(index)}/value_node/value` : `${this.statItemPath(index)}/value`;

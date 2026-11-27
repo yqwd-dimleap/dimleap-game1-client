@@ -112,7 +112,7 @@ export class HeroCollectionPanel {
         }
         this.hide();
         this.replacingId = id;
-        this.replaceSource.set(source.worldPosition);
+        this.replaceSource.set(point);
         this.modals.open(this.replaceNode, { bounds: this.replaceNode.getChildByName('Backdrop') ?? undefined });
         this.replaceView.show(id, this.store.snapshot().lineup, point, this.replaceSource);
     }
