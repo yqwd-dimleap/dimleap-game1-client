@@ -1,0 +1,11 @@
+UI_hulu.png
+size:128,64
+filter:Linear,Linear
+pma:true
+heihulu
+bounds:2,2,30,33
+honghulu
+bounds:65,3,29,32
+offsets:0,0,30,33
+lanhulu
+bounds:34,2,29,33

@@ -25,7 +25,9 @@ export class HeroCardView extends Component {
     private longPress = false;
     private ignoreClicksUntil = 0;
     private scrollView?: ScrollView;
+    private scrollCancelInnerEvents?: boolean;
     private globalDragInput = false;
+    private nativeWxInput = false;
     private readonly pointer = (event: EventTouch | EventMouse): Vec3 => {
         const point = event.getUILocation();
         return new Vec3(point.x, point.y, 0);
@@ -36,6 +38,10 @@ export class HeroCardView extends Component {
         this.touchStart.set(point);
         this.touchActive = true;
         this.longPress = false;
+        if (this.scrollView && this.scrollCancelInnerEvents === undefined) {
+            this.scrollCancelInnerEvents = this.scrollView.cancelInnerEvents;
+            this.scrollView.cancelInnerEvents = false;
+        }
         this.longPressTimer = setTimeout(() => {
             this.longPressTimer = undefined;
             if (!this.touchActive || !this.drag) return;
@@ -60,11 +66,11 @@ export class HeroCardView extends Component {
         this.clearLongPressTimer();
         this.finishLongPress(this.pointer(event));
     };
-    private readonly onTouchCancel = (): void => {
+    private readonly onTouchCancel = (event: EventTouch): void => {
         this.clearLongPressTimer();
         // Opening the modal can cancel the original card's touch. The global
         // mouse/touch listeners remain responsible for finishing the gesture.
-        if (!this.longPress) this.cancelLongPress();
+        if (!event.simulate && !this.longPress) this.cancelLongPress();
     };
     private readonly onGlobalTouchMove = (event: EventTouch): void => {
         if (!this.touchActive || !this.longPress) return;
@@ -74,8 +80,9 @@ export class HeroCardView extends Component {
         if (!this.touchActive || !this.longPress) return;
         this.finishLongPress(this.pointer(event));
     };
-    private readonly onGlobalTouchCancel = (): void => {
+    private readonly onGlobalTouchCancel = (event: EventTouch): void => {
         if (!this.touchActive || !this.longPress) return;
+        if (event.simulate) return;
         this.cancelLongPress();
     };
     private readonly onGlobalMouseMove = (event: EventMouse): void => {
@@ -96,6 +103,23 @@ export class HeroCardView extends Component {
         const point = this.domPointer(event);
         if (point) this.finishLongPress(point);
     };
+    private readonly onWxTouchMove = (event: { touches?: { clientX: number; clientY: number }[] }): void => {
+        if (!this.touchActive || !this.longPress) return;
+        const touch = event.touches?.[0];
+        if (touch) this.drag?.move(this.wxPointer(touch));
+    };
+    private readonly onWxTouchEnd = (event: {
+        touches?: { clientX: number; clientY: number }[];
+        changedTouches?: { clientX: number; clientY: number }[];
+    }): void => {
+        if (!this.touchActive || !this.longPress) return;
+        const touch = event.changedTouches?.[0] ?? event.touches?.[0];
+        if (touch) this.finishLongPress(this.wxPointer(touch));
+    };
+    private readonly onWxTouchCancel = (): void => {
+        if (!this.touchActive || !this.longPress) return;
+        this.cancelLongPress();
+    };
     private finishLongPress(point: Vec3): void {
         if (!this.touchActive) return;
         const dragged = this.longPress;
@@ -105,6 +129,7 @@ export class HeroCardView extends Component {
             this.drag?.end(point);
         }
         if (this.scrollView && !this.scrollView.enabled) this.scrollView.enabled = true;
+        this.restoreScrollCancellation();
         this.touchActive = false;
         this.longPress = false;
     }
@@ -117,6 +142,7 @@ export class HeroCardView extends Component {
             this.drag?.cancel();
         }
         if (this.scrollView && !this.scrollView.enabled) this.scrollView.enabled = true;
+        this.restoreScrollCancellation();
         this.touchActive = false;
         this.longPress = false;
     }
@@ -131,6 +157,13 @@ export class HeroCardView extends Component {
             window.addEventListener('pointermove', this.onDomPointerMove, true);
             window.addEventListener('pointerup', this.onDomPointerUp, true);
         }
+        const wx = (globalThis as any).wx;
+        if (wx?.onTouchMove && wx?.onTouchEnd) {
+            wx.onTouchMove(this.onWxTouchMove);
+            wx.onTouchEnd(this.onWxTouchEnd);
+            wx.onTouchCancel?.(this.onWxTouchCancel);
+            this.nativeWxInput = true;
+        }
         this.globalDragInput = true;
     }
     private unbindGlobalDragInput(): void {
@@ -144,6 +177,13 @@ export class HeroCardView extends Component {
             window.removeEventListener('pointermove', this.onDomPointerMove, true);
             window.removeEventListener('pointerup', this.onDomPointerUp, true);
         }
+        if (this.nativeWxInput) {
+            const wx = (globalThis as any).wx;
+            wx?.offTouchMove?.(this.onWxTouchMove);
+            wx?.offTouchEnd?.(this.onWxTouchEnd);
+            wx?.offTouchCancel?.(this.onWxTouchCancel);
+            this.nativeWxInput = false;
+        }
         this.globalDragInput = false;
     }
     private domPointer(event: PointerEvent): Vec3 | null {
@@ -156,6 +196,22 @@ export class HeroCardView extends Component {
             (event.clientX - rect.left) / rect.width * visible.width,
             (rect.bottom - event.clientY) / rect.height * visible.height,
             0);
+    }
+    private wxPointer(touch: { clientX: number; clientY: number }): Vec3 {
+        const wx = (globalThis as any).wx;
+        const info = wx?.getWindowInfo?.() ?? wx?.getSystemInfoSync?.() ?? {};
+        const windowWidth = Number(info.windowWidth) || Number(info.screenWidth) || 1;
+        const windowHeight = Number(info.windowHeight) || Number(info.screenHeight) || 1;
+        const visible = view.getVisibleSize();
+        return new Vec3(
+            touch.clientX / windowWidth * visible.width,
+            visible.height - touch.clientY / windowHeight * visible.height,
+            0);
+    }
+    private restoreScrollCancellation(): void {
+        if (!this.scrollView || this.scrollCancelInnerEvents === undefined) return;
+        this.scrollView.cancelInnerEvents = this.scrollCancelInnerEvents;
+        this.scrollCancelInnerEvents = undefined;
     }
     private readonly onClick = (): void => {
         if (Date.now() >= this.ignoreClicksUntil) this.click?.();
@@ -216,6 +272,7 @@ export class HeroCardView extends Component {
         this.node.off(NodeEventType.TOUCH_END, this.onTouchEnd, this);
         this.node.off(NodeEventType.TOUCH_CANCEL, this.onTouchCancel, this);
         if (this.scrollView && !this.scrollView.enabled) this.scrollView.enabled = true;
+        this.restoreScrollCancellation();
         this.scrollView = undefined;
         this.click = undefined; this.drag = undefined;
     }

@@ -4,7 +4,6 @@ export const BUNDLES = {
     settings: 'settings_ui',
     heroes: 'heroes_bundle',
     battleRuntime: 'battle_runtime',
-    battlePresentation: 'battle_presentation',
     map: 'map_bundle',
     combatShared: 'combat_shared',
     combatHeroes: 'combat_heroes',

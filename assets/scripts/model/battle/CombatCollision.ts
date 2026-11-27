@@ -10,12 +10,21 @@ export const UNIT_SPACING = 48;
 const ROUTE_CLEARANCE = 6;
 /** Prevent Box2D contact skin from turning a valid path step into a zero-length step. */
 const MOVEMENT_CLEARANCE = .75;
+/** A walking unit that cannot make meaningful progress for this long is treated as stuck. */
+const STUCK_DISTANCE = 6;
+const STUCK_SECONDS = .8;
 interface MovingUnit extends Point { id: number; team: Team }
 export interface CombatBounds { x: number; y: number; centerX?: number; centerY?: number }
 export type CombatObstacle =
     | { id?: string; kind: 'circle'; x: number; y: number; radius: number }
     | { id?: string; kind: 'box'; x: number; y: number; halfWidth: number; halfHeight: number; angle: number };
-export interface SteeringState { side: number; blockedFor: number }
+export interface SteeringState {
+    side: number;
+    blockedFor: number;
+    anchorX?: number;
+    anchorY?: number;
+    stalledFor?: number;
+}
 export interface CombatMovementScratch {
     readonly index: [CombatSpatial<MovingUnit>, CombatSpatial<MovingUnit>];
     readonly reserved: Map<number, Point>;
@@ -441,7 +450,16 @@ export function moveCombatUnits(units: readonly MovingUnit[], goals: ReadonlyMap
             const dx = steer !== goal && steerLength > 1e-9 ? steerX / steerLength * requestedLength : requestedX;
             const dy = steer !== goal && steerLength > 1e-9 ? steerY / steerLength * requestedLength : requestedY;
             const state = steering?.get(unit.id) ?? { side: 0, blockedFor: 0 };
+            if (state.anchorX === undefined || state.anchorY === undefined) {
+                state.anchorX = start.x;
+                state.anchorY = start.y;
+                state.stalledFor = 0;
+            }
+            state.stalledFor = (state.stalledFor ?? 0) + dt;
             if (advancedRoute) {
+                state.anchorX = start.x;
+                state.anchorY = start.y;
+                state.stalledFor = 0;
                 state.side = 0;
                 state.blockedFor = 0;
             }
@@ -486,6 +504,53 @@ export function moveCombatUnits(units: readonly MovingUnit[], goals: ReadonlyMap
                 }
             }
             state.blockedFor = next === start ? state.blockedFor + dt : 0;
+            if ((state.stalledFor ?? 0) >= STUCK_SECONDS) {
+                const madeProgress = Math.hypot(start.x - state.anchorX, start.y - state.anchorY) >= STUCK_DISTANCE;
+                if (!madeProgress) {
+                    const startBlocked = obstacles.some(obstacle =>
+                        circleIntersectsObstacle(start, UNIT_RADIUS + MOVEMENT_CLEARANCE, obstacle));
+                    const recoveryClear = (candidate: Point): boolean => {
+                        if (Math.abs(candidate.x - cx) > bounds.x || Math.abs(candidate.y - cy) > bounds.y) return false;
+                        if (obstacles.some(obstacle =>
+                            circleIntersectsObstacle(candidate, UNIT_RADIUS + MOVEMENT_CLEARANCE, obstacle))) return false;
+                        if (!startBlocked && obstacles.some(obstacle =>
+                            segmentIntersectsObstacle(start, candidate, UNIT_RADIUS + MOVEMENT_CLEARANCE, obstacle))) return false;
+                        for (const other of neighbours) {
+                            if (other.id === unit.id) continue;
+                            const position = reserved.get(other.id) ?? positionMap.get(other.id)!;
+                            if (Math.hypot(candidate.x - position.x, candidate.y - position.y) < UNIT_SPACING - 1e-6)
+                                return false;
+                        }
+                        return true;
+                    };
+                    let recovery: Point | null = null, recoveryScore = Infinity;
+                    for (const distance of [UNIT_RADIUS / 2, UNIT_RADIUS, UNIT_RADIUS + 8, UNIT_SPACING]) {
+                        for (let i = 0; i < 24; i++) {
+                            const angle = i * Math.PI / 12;
+                            const candidate = {
+                                x: start.x + Math.cos(angle) * distance,
+                                y: start.y + Math.sin(angle) * distance,
+                            };
+                            if (!recoveryClear(candidate)) continue;
+                            const score = Math.hypot(candidate.x - goal.x, candidate.y - goal.y) + distance * .25;
+                            if (score < recoveryScore) {
+                                recovery = candidate;
+                                recoveryScore = score;
+                            }
+                        }
+                        if (recovery) break;
+                    }
+                    if (recovery) {
+                        next = recovery;
+                        routes.delete(unit.id);
+                        state.side = state.side === 0 ? (unit.id % 2 === 0 ? 1 : -1) : -state.side;
+                        state.blockedFor = 0;
+                    }
+                }
+                state.anchorX = next.x;
+                state.anchorY = next.y;
+                state.stalledFor = 0;
+            }
             steering?.set(unit.id, state);
         }
         reserved.set(unit.id, next);

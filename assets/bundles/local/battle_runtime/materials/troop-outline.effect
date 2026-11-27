@@ -1,0 +1,111 @@
+// Copyright (c) 2017-2020 Xiamen Yaji Software Co., Ltd.
+CCEffect %{
+  techniques:
+  - passes:
+    - vert: sprite-vs:vert
+      frag: sprite-fs:frag
+      depthStencilState:
+        depthTest: false
+        depthWrite: false
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one_minus_src_alpha
+          blendDstAlpha: one_minus_src_alpha
+      rasterizerState:
+        cullMode: none
+      properties:
+        outlineColor: { value: [1, 0.15, 0.15, 1], editor: { type: color } }
+        outlineParams: { value: [0.002, 0.002, 0, 0] }
+        alphaThreshold: { value: 0.5 }
+}%
+
+CCProgram sprite-vs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+  #if USE_LOCAL
+    #include <builtin/uniforms/cc-local>
+  #endif
+
+  in vec3 a_position;
+  in vec2 a_texCoord;
+  in vec4 a_color;
+
+  out vec4 v_light;
+  out vec2 uv0;
+
+  #if TWO_COLORED
+    in vec4 a_color2;
+    out vec4 v_dark;
+  #endif
+
+  vec4 vert () {
+    vec4 pos = vec4(a_position, 1);
+
+    #if USE_LOCAL
+      pos = cc_matWorld * pos;
+    #endif
+
+    pos = cc_matViewProj * pos;
+
+    uv0 = a_texCoord;
+
+    v_light = a_color;
+    #if TWO_COLORED
+      v_dark = a_color2;
+    #endif
+
+    return pos;
+  }
+}%
+
+CCProgram sprite-fs %{
+  precision highp float;
+  #include <builtin/internal/alpha-test>
+
+  in vec4 v_light;
+  #if TWO_COLORED
+    in vec4 v_dark;
+  #endif
+  in vec2 uv0;
+  #pragma builtin(local)
+  layout(set = 2, binding = 12) uniform sampler2D cc_spriteTexture;
+
+  uniform Outline {
+    vec4 outlineColor;
+    vec4 outlineParams;
+  };
+
+  vec4 frag () {
+
+    vec4 o = vec4(1, 1, 1, 1);
+    #if TWO_COLORED
+      vec4 texColor = vec4(1, 1, 1, 1);
+
+      texColor *= texture(cc_spriteTexture, uv0);
+ 	    o.a = texColor.a * v_light.a;
+      o.rgb = ((texColor.a - 1.0) * v_dark.a + 1.0 - texColor.rgb) * v_dark.rgb + texColor.rgb * v_light.rgb;
+    #else
+      o *= texture(cc_spriteTexture, uv0);
+      o *= v_light;
+    #endif
+
+    // A narrow inner contour stays visible even on tight Spine mesh boundaries.
+    // Atlas gutters are 2px; keep the authored sampling width below that padding.
+    vec2 s = outlineParams.xy;
+    float edge = texture(cc_spriteTexture, uv0 + vec2(s.x, 0.0)).a;
+    edge = min(edge, texture(cc_spriteTexture, uv0 - vec2(s.x, 0.0)).a);
+    edge = min(edge, texture(cc_spriteTexture, uv0 + vec2(0.0, s.y)).a);
+    edge = min(edge, texture(cc_spriteTexture, uv0 - vec2(0.0, s.y)).a);
+    edge = min(edge, texture(cc_spriteTexture, uv0 + s).a);
+    edge = min(edge, texture(cc_spriteTexture, uv0 - s).a);
+    edge = min(edge, texture(cc_spriteTexture, uv0 + vec2(s.x, -s.y)).a);
+    edge = min(edge, texture(cc_spriteTexture, uv0 + vec2(-s.x, s.y)).a);
+    float contour = step(0.000001, max(s.x, s.y)) * (1.0 - smoothstep(0.05, 0.8, edge)) * outlineColor.a;
+    // All four supplied Spine atlases use premultiplied alpha.
+    o.rgb = mix(o.rgb, outlineColor.rgb * o.a, contour);
+    ALPHA_TEST(o);
+    return o;
+  }
+}%

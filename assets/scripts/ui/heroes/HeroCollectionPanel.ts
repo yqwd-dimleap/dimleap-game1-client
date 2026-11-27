@@ -28,6 +28,8 @@ export interface HeroCollectionAssets {
 
 /** Owns instances of the authored templates, while the store owns saved progression. */
 export class HeroCollectionPanel {
+    private static readonly MIN_SCROLL_HEIGHT = 800;
+    private static readonly NAV_GAP = 17;
     private selected: HeroId | null = null;
     private cards: HeroCardView[] = [];
     private slots: { node: Node; card: LineupHeroCardView }[] = [];
@@ -49,12 +51,25 @@ export class HeroCollectionPanel {
     private actionPending = false;
     private placementPending = false;
     private replacingId: HeroId | null = null;
+    private scrollNode?: Node;
+    private scrollTransform?: UITransform;
+    private scrollMaskTransform?: UITransform;
+    private scrollBarTransform?: UITransform;
     private readonly replaceSource = new Vec3();
 
     constructor(readonly node: Node, private store: HeroProgressStore,
         private assets: HeroCollectionAssets, private modals: ModalPresenter) {
         const content = node.getChildByPath('ScrollView/view/content');
         if (!content) throw new Error('HeroCollection requires ScrollView/view/content');
+        const scrollNode = this.scrollNode = node.getChildByName('ScrollView') ?? undefined;
+        const scrollTransform = this.scrollTransform = scrollNode?.getComponent(UITransform) ?? undefined;
+        const scrollMaskTransform = this.scrollMaskTransform =
+            scrollNode?.getChildByName('view')?.getComponent(UITransform) ?? undefined;
+        const scrollBarTransform = this.scrollBarTransform =
+            scrollNode?.getChildByName('scrollBar')?.getComponent(UITransform) ?? undefined;
+        if (!scrollNode || !scrollTransform || !scrollMaskTransform) {
+            throw new Error('HeroCollection requires a measured ScrollView/view');
+        }
         this.bindUnlockControls();
         this.ensureReplaceOverlay();
         DEPLOYABLE_HERO_IDS.forEach((id, i) => {
@@ -92,7 +107,41 @@ export class HeroCollectionPanel {
             slot.on(Button.EventType.CLICK, click);
             this.listeners.push(() => { if (isValid(slot, true)) slot.off(Button.EventType.CLICK, click); });
         }
+        this.layout();
         this.refresh();
+    }
+
+    /** Extend only the scroll viewport on taller screens; the authored top stays fixed. */
+    layout(): void {
+        const scrollNode = this.scrollNode, scroll = this.scrollTransform;
+        if (this.disposed || !isValid(scrollNode, true) || !scroll) return;
+        const parentTransform = scrollNode.parent?.getComponent(UITransform);
+        const nav = this.findBottomNav();
+        const navTransform = nav?.getComponent(UITransform);
+        if (!parentTransform || !navTransform) return;
+
+        const scrollBox = scroll.getBoundingBoxToWorld();
+        const navBox = navTransform.getBoundingBoxToWorld();
+        const top = parentTransform.convertToNodeSpaceAR(
+            new Vec3(scrollBox.x + scrollBox.width * 0.5, scrollBox.y + scrollBox.height, 0));
+        const navTop = parentTransform.convertToNodeSpaceAR(
+            new Vec3(navBox.x + navBox.width * 0.5, navBox.y + navBox.height, 0));
+        const height = Math.max(HeroCollectionPanel.MIN_SCROLL_HEIGHT,
+            top.y - navTop.y - HeroCollectionPanel.NAV_GAP);
+        if (Math.abs(scroll.height - height) < 0.5) return;
+
+        scroll.setContentSize(scroll.width, height);
+        this.scrollMaskTransform?.setContentSize(scroll.width, height);
+        this.scrollBarTransform?.setContentSize(this.scrollBarTransform.width, height);
+        scrollNode.setPosition(scrollNode.position.x, top.y - height * 0.5, scrollNode.position.z);
+    }
+
+    private findBottomNav(): Node | undefined {
+        for (let ancestor = this.node.parent; ancestor; ancestor = ancestor.parent) {
+            const nav = ancestor.getChildByName('BottomNav');
+            if (nav) return nav;
+        }
+        return undefined;
     }
 
     private ensureReplaceOverlay(): void {
@@ -334,5 +383,9 @@ export class HeroCollectionPanel {
         this.replaceNode = undefined;
         this.replaceView = undefined;
         this.overlays = undefined;
+        this.scrollNode = undefined;
+        this.scrollTransform = undefined;
+        this.scrollMaskTransform = undefined;
+        this.scrollBarTransform = undefined;
     }
 }

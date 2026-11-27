@@ -44,10 +44,10 @@ export function setupCenter(header?: { x: number; y: number; width: number; heig
 }
 /** VS spine ships with battle_runtime and is authored on MatchView/VSView. */
 export const MATCH_SPINE_PATH = 'animations/pipei/UI_pipei_VS';
-export const SETTLEMENT_SPINE_PATH = 'results/animations/shengli_shibai/UI_shengli_shibai';
-export const SETTLEMENT_PREFAB_PATH = 'results/BattleSettlement';
-export const ROUND_SETTLEMENT_PREFAB_PATH = 'transitions/RoundSettlement';
-export const BATTLE_PAUSE_PREFAB_PATH = 'pause/BattlePause';
+export const SETTLEMENT_SPINE_PATH = 'animations/shengli_shibai/UI_shengli_shibai';
+export const SETTLEMENT_PREFAB_PATH = 'prefabs/BattleSettlement';
+export const ROUND_SETTLEMENT_PREFAB_PATH = 'prefabs/RoundSettlement';
+export const BATTLE_PAUSE_PREFAB_PATH = 'prefabs/BattlePause';
 export interface BattleMapDefinition { id: string; name: string; bundle: string; path: string }
 /** The beginner map is local; the remaining authored maps stay in remote map_bundle. */
 export const BATTLE_MAPS: readonly BattleMapDefinition[] = [
@@ -87,8 +87,8 @@ export function battleMapById(id: string): BattleMapDefinition {
     return found;
 }
 export const SETTLEMENT_ART_PATHS = {
-    victory: 'results/textures/victory_icon/spriteFrame',
-    failure: 'results/textures/fail_icon/spriteFrame',
+    victory: 'textures/ui/victory_icon/spriteFrame',
+    failure: 'textures/ui/fail_icon/spriteFrame',
 } as const;
 export interface CombatContentReference { bundle: string; path: string }
 /** Batched troop animations stay in the shared remote pack; named heroes live separately. */

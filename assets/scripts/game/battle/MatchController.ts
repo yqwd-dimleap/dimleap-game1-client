@@ -137,16 +137,12 @@ export class MatchController extends Component {
     private maxFrameMs = 0;
     private matching?: MatchView;
     private settlement?: BattleSettlementView;
-    private settlementLoading?: Promise<BattleSettlementView | undefined>;
     private match?: BattleMatch;
     private avatars: readonly SpriteFrame[] = [];
     private roundSettlement?: RoundSettlementView;
-    private roundSettlementLoading?: Promise<RoundSettlementView | undefined>;
     private roundPresentationSerial = 0;
     private seriesFinalized = false;
     private battlePause?: BattlePauseView;
-    private battlePauseLoading?: Promise<BattlePauseView | undefined>;
-    private presentationPrewarmStarted = false;
     private matchStage = 'matching';
     private tutorialGuide?: NewbieGuideView;
     private tutorialStage: 'none' | 'welcome' | 'select' | 'shoot-prompt' | 'shoot' | 'done' = 'none';
@@ -260,8 +256,11 @@ export class MatchController extends Component {
             // Defer battle input until both real assets and the transition animation are ready.
             void matchAnimation.then(data => { if (isValid(this.matching, true)) this.matching!.animate(data); }).catch(() => {});
             let handPrefab: Prefab, cardPrefab: Prefab, vsPrefab: Prefab, arrowPrefab: Prefab;
+            let pausePrefab: Prefab, roundSettlementPrefab: Prefab, settlementPrefab: Prefab;
             let blueLine: SpriteFrame, redLine: SpriteFrame;
-            [this.tokenPrefab, this.unitPrefab, handPrefab, cardPrefab, vsPrefab, arrowPrefab, blueLine, redLine] = await Promise.all([
+            let settlementData: sp.SkeletonData, victoryArt: SpriteFrame, failureArt: SpriteFrame;
+            [this.tokenPrefab, this.unitPrefab, handPrefab, cardPrefab, vsPrefab, arrowPrefab, blueLine, redLine,
+                pausePrefab, roundSettlementPrefab, settlementPrefab, settlementData, victoryArt, failureArt] = await Promise.all([
                 resources.load(BUNDLES.battleRuntime, 'prefabs/HeroToken', Prefab, undefined, 'critical'),
                 resources.load(BUNDLES.battleRuntime, 'prefabs/Unit', Prefab, undefined, 'critical'),
                 resources.load(BUNDLES.battleRuntime, 'prefabs/BattleHand', Prefab, undefined, 'normal'),
@@ -270,8 +269,37 @@ export class MatchController extends Component {
                 resources.load(BUNDLES.battleRuntime, 'prefabs/ArrowProjectile', Prefab, undefined, 'normal'),
                 resources.load(BUNDLES.battleRuntime, 'textures/ui/blue_line/spriteFrame', SpriteFrame, undefined, 'normal'),
                 resources.load(BUNDLES.battleRuntime, 'textures/ui/red_line/spriteFrame', SpriteFrame, undefined, 'normal'),
+                resources.load(BUNDLES.battleRuntime, BATTLE_PAUSE_PREFAB_PATH, Prefab, undefined, 'normal'),
+                resources.load(BUNDLES.battleRuntime, ROUND_SETTLEMENT_PREFAB_PATH, Prefab, undefined, 'normal'),
+                resources.load(BUNDLES.battleRuntime, SETTLEMENT_PREFAB_PATH, Prefab, undefined, 'normal'),
+                resources.load(BUNDLES.battleRuntime, SETTLEMENT_SPINE_PATH, sp.SkeletonData, undefined, 'normal'),
+                resources.load(BUNDLES.battleRuntime, SETTLEMENT_ART_PATHS.victory, SpriteFrame, undefined, 'normal'),
+                resources.load(BUNDLES.battleRuntime, SETTLEMENT_ART_PATHS.failure, SpriteFrame, undefined, 'normal'),
             ]);
             if (!isValid(this, true) || this.leaving) return;
+            const pauseRoot = instantiate(pausePrefab);
+            this.setUILayer(pauseRoot);
+            this.hud.node.addChild(pauseRoot);
+            this.battlePause = pauseRoot.getComponent(BattlePauseView) ?? pauseRoot.addComponent(BattlePauseView);
+            this.battlePause.initialize(() => {
+                this.battlePause?.hide();
+                void this.returnHome();
+            });
+            const roundRoot = instantiate(roundSettlementPrefab);
+            this.setUILayer(roundRoot);
+            this.hud.node.addChild(roundRoot);
+            this.roundSettlement = roundRoot.getComponent(RoundSettlementView) ?? roundRoot.addComponent(RoundSettlementView);
+            this.roundSettlement.initialize();
+            const settlementRoot = instantiate(settlementPrefab);
+            this.setUILayer(settlementRoot);
+            this.hud.node.addChild(settlementRoot);
+            settlementRoot.active = false;
+            this.settlement = settlementRoot.getComponent(BattleSettlementView) ?? undefined;
+            if (!this.settlement) {
+                settlementRoot.destroy();
+                throw new Error('BattleSettlement requires BattleSettlementView');
+            }
+            this.settlement.initialize(settlementData, victoryArt, failureArt);
             this.aimGuide = new AimGuideView(this.world.aim, blueLine, redLine);
             const lineup = tutorialBattle ? STARTER_LINEUP :
                 app.heroes.snapshot().lineup.filter((id): id is HeroId => !!id);
@@ -295,6 +323,9 @@ export class MatchController extends Component {
             this.hand = handRoot.getComponent(BattleHandPanel) ?? undefined;
             if (!this.hand) throw new Error('BattleHand requires BattleHandPanel');
             this.hand.initialize(hero => this.selectHero(hero), cardPrefab, icons, cardFrames);
+            // Presentation overlays are created before the hand for parallel loading, then
+            // moved above it so their full-screen blockers render over every battle control.
+            for (const overlay of [pauseRoot, roundRoot, settlementRoot]) overlay.setSiblingIndex(this.hud.node.children.length - 1);
             if (!isValid(this, true) || this.leaving) return;
             this.throwInput = new ThrowInput(this.board,
                 p => this.session.phase === 'ready' && this.session.pending && distance(p, this.session.pending.node.position) < 74
@@ -326,7 +357,6 @@ export class MatchController extends Component {
             vsNode.destroy(); matchNode.destroy(); this.matching = undefined;
             this.matchStage = 'battle'; this.hud.node.active = true; this.world.camera.enabled = true;
             this.loaded = true;
-            this.schedulePresentationPrewarm();
             this.series.setWinsRequired(2);
             this.reset('battle');
             if (tutorialBattle) {
@@ -365,143 +395,9 @@ export class MatchController extends Component {
         }
     }
 
-    /** Prewarm optional remote presentation after combat is interactive, never before first render. */
-    private schedulePresentationPrewarm(): void {
-        if (this.presentationPrewarmStarted) return;
-        this.presentationPrewarmStarted = true;
-        this.scheduleOnce(() => { void this.prewarmBattlePresentation(); }, 1);
-    }
-
-    private async prewarmBattlePresentation(): Promise<void> {
-        try {
-            await GameApp.instance.res.bundle(BUNDLES.battlePresentation);
-            if (!isValid(this, true) || this.leaving) return;
-            await Promise.all([this.ensureBattlePause(), this.ensureRoundSettlement()]);
-            await new Promise<void>(resolve => this.scheduleOnce(resolve, 2.5));
-            if (!isValid(this, true) || this.leaving) return;
-            await this.ensureBattleSettlement();
-            if (DEBUG) console.info('[Battle] remote presentation prewarm complete');
-        } catch (error) {
-            console.warn('[Battle] remote presentation prewarm failed; gameplay fallback remains available', error);
-        }
-    }
-
-    private async openBattlePause(): Promise<void> {
+    private openBattlePause(): void {
         if (GameApp.instance.isTutorialBattle || !this.loaded || this.leaving || this.session.phase === 'result') return;
-        this.hud.status('正在加载暂停界面…');
-        try {
-            const view = await this.withPresentationTimeout(
-                this.ensureBattlePause(), 2.5, '暂停界面');
-            if (!isValid(this, true) || this.leaving || !view) return;
-            this.hud.status('');
-            view.show();
-        } catch (error) {
-            console.warn('[Battle] pause presentation unavailable', error);
-            if (isValid(this, true)) this.hud.status('暂停界面加载失败，请稍后重试');
-        }
-    }
-
-    private ensureBattlePause(): Promise<BattlePauseView | undefined> {
-        if (this.battlePause && isValid(this.battlePause, true)) return Promise.resolve(this.battlePause);
-        if (this.battlePauseLoading) return this.battlePauseLoading;
-        const task = (async (): Promise<BattlePauseView | undefined> => {
-            await GameApp.instance.res.bundle(BUNDLES.battlePresentation);
-            const resources = this.resources;
-            if (!resources || !isValid(this, true) || this.leaving || !this.hud) return undefined;
-            const prefab = await resources.load(BUNDLES.battlePresentation,
-                BATTLE_PAUSE_PREFAB_PATH, Prefab, undefined, 'background');
-            if (!isValid(this, true) || this.leaving || !this.hud) return undefined;
-            const root = instantiate(prefab);
-            this.setUILayer(root);
-            this.hud.node.addChild(root);
-            const view = root.getComponent(BattlePauseView) ?? root.addComponent(BattlePauseView);
-            view.initialize(() => { view.hide(); void this.returnHome(); });
-            this.battlePause = view;
-            return view;
-        })();
-        this.battlePauseLoading = task;
-        const clear = (): void => { if (this.battlePauseLoading === task) this.battlePauseLoading = undefined; };
-        void task.then(clear, clear);
-        return task;
-    }
-
-    private ensureRoundSettlement(): Promise<RoundSettlementView | undefined> {
-        if (this.roundSettlement && isValid(this.roundSettlement, true)) return Promise.resolve(this.roundSettlement);
-        if (this.roundSettlementLoading) return this.roundSettlementLoading;
-        const task = (async (): Promise<RoundSettlementView | undefined> => {
-            await GameApp.instance.res.bundle(BUNDLES.battlePresentation);
-            const resources = this.resources;
-            if (!resources || !isValid(this, true) || this.leaving || !this.hud) return undefined;
-            const prefab = await resources.load(BUNDLES.battlePresentation,
-                ROUND_SETTLEMENT_PREFAB_PATH, Prefab, undefined, 'background');
-            if (!isValid(this, true) || this.leaving || !this.hud) return undefined;
-            const root = instantiate(prefab);
-            this.setUILayer(root);
-            this.hud.node.addChild(root);
-            const view = root.getComponent(RoundSettlementView) ?? root.addComponent(RoundSettlementView);
-            view.initialize();
-            this.roundSettlement = view;
-            return view;
-        })();
-        this.roundSettlementLoading = task;
-        const clear = (): void => { if (this.roundSettlementLoading === task) this.roundSettlementLoading = undefined; };
-        void task.then(clear, clear);
-        return task;
-    }
-
-    private ensureBattleSettlement(): Promise<BattleSettlementView | undefined> {
-        if (this.settlement && isValid(this.settlement, true)) return Promise.resolve(this.settlement);
-        if (this.settlementLoading) return this.settlementLoading;
-        const task = (async (): Promise<BattleSettlementView | undefined> => {
-            await GameApp.instance.res.bundle(BUNDLES.battlePresentation);
-            const resources = this.resources;
-            if (!resources || !isValid(this, true) || this.leaving || !this.hud) return undefined;
-            const [prefab, data, victoryArt, failureArt] = await Promise.all([
-                resources.load(BUNDLES.battlePresentation, SETTLEMENT_PREFAB_PATH, Prefab, undefined, 'background'),
-                resources.load(BUNDLES.battlePresentation, SETTLEMENT_SPINE_PATH, sp.SkeletonData, undefined, 'background'),
-                resources.load(BUNDLES.battlePresentation, SETTLEMENT_ART_PATHS.victory, SpriteFrame, undefined, 'background'),
-                resources.load(BUNDLES.battlePresentation, SETTLEMENT_ART_PATHS.failure, SpriteFrame, undefined, 'background'),
-            ]);
-            if (!isValid(this, true) || this.leaving || !this.hud) return undefined;
-            const root = instantiate(prefab);
-            this.setUILayer(root);
-            this.hud.node.addChild(root);
-            root.active = false;
-            const view = root.getComponent(BattleSettlementView) ?? undefined;
-            if (!view) {
-                root.destroy();
-                throw new Error('BattleSettlement requires BattleSettlementView');
-            }
-            view.initialize(data, victoryArt, failureArt);
-            this.settlement = view;
-            return view;
-        })();
-        this.settlementLoading = task;
-        const clear = (): void => { if (this.settlementLoading === task) this.settlementLoading = undefined; };
-        void task.then(clear, clear);
-        return task;
-    }
-
-    private withPresentationTimeout<T>(promise: Promise<T>, seconds: number, label: string): Promise<T> {
-        return new Promise<T>((resolve, reject) => {
-            let settled = false;
-            const timer = setTimeout(() => {
-                if (settled) return;
-                settled = true;
-                reject(new Error(`${label}加载超时`));
-            }, seconds * 1000);
-            promise.then(value => {
-                if (settled) return;
-                settled = true;
-                clearTimeout(timer);
-                resolve(value);
-            }, error => {
-                if (settled) return;
-                settled = true;
-                clearTimeout(timer);
-                reject(error);
-            });
-        });
+        this.battlePause?.show();
     }
 
     private async loadTutorialGuide(resources: ResourceScope): Promise<void> {
@@ -907,8 +803,7 @@ export class MatchController extends Component {
         summary: { count: number[]; hp: number[] }): Promise<void> {
         let view: RoundSettlementView | undefined;
         try {
-            view = await this.withPresentationTimeout(
-                this.ensureRoundSettlement(), 3.5, '回合结算界面');
+            view = this.roundSettlement;
             if (!view) throw new Error('RoundSettlement is unavailable');
             await view.play(roundWinner, this.match!, this.avatars, this.series.lives, this.series.maxLives);
         } catch (error) {
@@ -961,8 +856,7 @@ export class MatchController extends Component {
         try {
             const resources = this.resources;
             if (!resources) throw new Error('Battle resource scope is unavailable');
-            const settlement = await this.withPresentationTimeout(
-                this.ensureBattleSettlement(), 5, '战斗结算界面');
+            const settlement = this.settlement;
             if (!isValid(this, true) || this.leaving) return;
             if (settlement) {
                 settlement.show(winner, detail, app.profile, resources, () => { void this.returnHome(); }, reward);

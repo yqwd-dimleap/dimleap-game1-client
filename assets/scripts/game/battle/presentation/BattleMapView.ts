@@ -1,4 +1,4 @@
-import { _decorator, BoxCollider2D, CircleCollider2D, Collider2D, Component, EffectAsset, Node, Sprite, UITransform, Vec2, Vec3 } from 'cc';
+import { _decorator, BoxCollider2D, CircleCollider2D, Collider2D, Component, EffectAsset, Node, Size, Sprite, UITransform, Vec2, Vec3 } from 'cc';
 import { RULES, Zone } from '../../../model/config/PrototypeConfig';
 import { authoredZoneLayout, randomZoneLayout, zoneOverlapsCircle } from '../../../model/battle/BattleMap';
 import type { CombatObstacle } from '../../../model/battle/CombatCollision';
@@ -13,6 +13,8 @@ export class BattleMapView extends Component {
     @property({ tooltip: '0为每局新种子；非0用于复现同一地图。' }) layoutSeed = 0;
     @property({ tooltip: '仅随机布局：增益轮廓距场地边缘的最小距离。固定地图保留编辑器位置。' }) edgeMargin = 48;
     @property({ tooltip: '随机布局中增益块之间的最小间距。' }) zoneGap = 16;
+    @property({ tooltip: '障碍物按完整图片区域生成矩形碰撞，忽略透明像素和原有不规则碰撞体。' })
+    fullSpriteObstacleBounds = true;
     mapId = '';
     private zoneRoot?: Node;
     private authored?: Zone[];
@@ -144,7 +146,21 @@ export class BattleMapView extends Component {
             for (const child of node.children) {
                 if (!child.activeInHierarchy) continue;
                 const existing = child.getComponents(Collider2D);
-                if (existing.length) {
+                const ui = child.getComponent(UITransform), sprite = child.getComponent(Sprite);
+                if (this.fullSpriteObstacleBounds && sprite && ui && ui.width > 0 && ui.height > 0) {
+                    // Treat each obstacle image as one solid rectangle. This avoids
+                    // transparent holes and concave authored colliders trapping troops.
+                    for (const collider of existing) child.removeComponent(collider);
+                    const collider = child.addComponent(BoxCollider2D);
+                    collider.size = new Size(ui.width, ui.height);
+                    collider.offset = new Vec2(
+                        (.5 - ui.anchorX) * ui.width,
+                        (.5 - ui.anchorY) * ui.height,
+                    );
+                    collider.group = 2;
+                    collider.apply();
+                    colliders.push(collider);
+                } else if (existing.length) {
                     for (const collider of existing) {
                         if (collider.group !== 2) collider.group = 2;
                         collider.apply();
@@ -154,7 +170,6 @@ export class BattleMapView extends Component {
                     // Several authored maps use obstacle art without physics metadata.
                     // Materialize a static circle from the sprite's final UITransform size
                     // so both guide reflection and token collision share one source of truth.
-                    const ui = child.getComponent(UITransform), sprite = child.getComponent(Sprite);
                     if (sprite && ui && ui.width > 0 && ui.height > 0) {
                         const collider = child.addComponent(CircleCollider2D);
                         collider.radius = Math.min(ui.width, ui.height) * .45;

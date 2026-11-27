@@ -1,4 +1,4 @@
-import { _decorator, Component, isValid, Prefab, SpriteFrame, sp } from 'cc';
+import { _decorator, Component, isValid, Prefab, screen, SpriteFrame, sp } from 'cc';
 import { ResourceScope } from '../../core/ResourceScope';
 import { BUNDLES } from '../../core/Bundles';
 import { HeroCollectionPanel } from '../../ui/heroes/HeroCollectionPanel';
@@ -18,6 +18,22 @@ export class HeroesController extends Component {
     private resources?: ResourceScope;
     private modals?: ModalPresenter;
     private disposed = false;
+    private readonly relayout = (): void => { this.panel?.layout(); };
+
+    onEnable(): void {
+        screen.on('window-resize', this.onWindowResize, this);
+    }
+
+    onDisable(): void {
+        screen.off('window-resize', this.onWindowResize, this);
+        this.unschedule(this.relayout);
+    }
+
+    private onWindowResize(): void {
+        this.unschedule(this.relayout);
+        this.scheduleOnce(this.relayout);
+    }
+
     async initialize(resources: ResourceScope, store: HeroProgressStore, modals: ModalPresenter): Promise<void> {
         this.resources = resources;
         this.modals = modals;
@@ -68,7 +84,10 @@ export class HeroesController extends Component {
         ]);
         return { frames, levels, names };
     }
-    show(): void { this.panel?.refresh(); }
+    show(): void {
+        this.panel?.layout();
+        this.panel?.refresh();
+    }
     hide(): void { this.panel?.hide(); }
     dispose(): void {
         if (this.disposed) return;

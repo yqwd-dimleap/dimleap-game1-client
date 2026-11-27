@@ -1,10 +1,10 @@
-import { _decorator, Button, Component, Label, Node, Sprite, SpriteFrame, UITransform, isValid, sp } from 'cc';
+import { _decorator, Button, Component, instantiate, Label, Node, Prefab, Sprite, SpriteFrame, UITransform, isValid, sp } from 'cc';
 import { ViewNodes } from '../../../ui/binding/ViewNodes';
 import type { ResourceLoader } from '../../../core/ResourceScope';
 import type { PlayerProfile } from '../../../model/player/PlayerProfile';
 import { playerRank } from '../../../model/player/PlayerRank';
-import { loadPlayerBadge } from '../../../ui/common/PlayerUIAssets';
-import { RankLevelView } from '../../../ui/season/RankLevelView';
+import { loadPlayerBadge, PLAYER_RANK_BUNDLE, RANK_LEVEL_PREFAB_PATH } from '../../../ui/common/PlayerUIAssets';
+import { RankLevelAssets, RankLevelView } from '../../../ui/season/RankLevelView';
 
 export interface SettlementReward {
     ok: boolean;
@@ -23,6 +23,10 @@ export class BattleSettlementView extends Component {
     private playerRevision = 0;
     private playerArtKey = '';
     private rankLevel?: RankLevelView;
+    private rankLevelNode?: Node;
+    private rankLevelLoading?: Promise<void>;
+    private rankAssets?: RankLevelAssets;
+    private playerProfile?: Readonly<PlayerProfile>;
     initialize(data: sp.SkeletonData, victoryArt: SpriteFrame, failureArt: SpriteFrame): void {
         const ui = this.ui ?? (this.ui = new ViewNodes(this.node));
         this.data = data;
@@ -30,7 +34,6 @@ export class BattleSettlementView extends Component {
         ui.at('bg/victory_icon', Sprite).spriteFrame = victoryArt;
         ui.at('bg/fail_icon', Sprite).spriteFrame = failureArt;
         this.detail = this.node.getChildByPath('Detail')?.getComponent(Label) ?? this.createDetailLabel();
-        this.rankLevel = this.node.getChildByPath('player_node/RankLevel')?.getComponent(RankLevelView) ?? undefined;
         const doubleReward = this.node.getChildByName('btn_double');
         if (doubleReward) doubleReward.active = false;
     }
@@ -64,11 +67,13 @@ export class BattleSettlementView extends Component {
         if (label) label.string = `x${value}`;
     }
     private renderPlayer(player: Readonly<PlayerProfile>, resources: ResourceLoader): void {
+        this.playerProfile = player;
         const revision = ++this.playerRevision, rank = playerRank(player.netStars);
         const nickname = this.node.getChildByPath('player_node/avatar_frame/nickname')?.getComponent(Label);
         if (nickname) nickname.string = player.nickname;
         const playerId = this.node.getChildByPath('player_node/avatar_frame/playerID')?.getComponent(Label);
         if (playerId) playerId.string = `ID:${player.playerId}`;
+        void this.ensureRankLevel(resources);
         this.rankLevel?.render(player.netStars);
         const key = `${player.avatar}:${rank.art}`;
         if (key === this.playerArtKey) return;
@@ -80,12 +85,49 @@ export class BattleSettlementView extends Component {
             if (levelSprite) levelSprite.spriteFrame = badge;
             const titleSprite = this.node.getChildByPath('player_node/RankLevel/level_node/title_bg')?.getComponent(Sprite);
             if (titleSprite) titleSprite.spriteFrame = title;
-            this.rankLevel?.render(player.netStars, { badges: [badge], titleBackgrounds: [title] });
+            const badges: SpriteFrame[] = [];
+            const titleBackgrounds: SpriteFrame[] = [];
+            badges[rank.art - 1] = badge;
+            titleBackgrounds[rank.art - 1] = title;
+            this.rankAssets = { badges, titleBackgrounds };
+            this.rankLevel?.render(player.netStars, this.rankAssets);
             this.playerArtKey = key;
         }).catch(error => {
             if (isValid(this, true) && revision === this.playerRevision)
                 console.error('[BattleSettlement] Player badge failed to load', error);
         });
+    }
+    private ensureRankLevel(resources: ResourceLoader): Promise<void> {
+        if (this.rankLevel && isValid(this.rankLevel, true)) return Promise.resolve();
+        if (this.rankLevelLoading) return this.rankLevelLoading;
+        const task = (async () => {
+            const prefab = await resources.load(PLAYER_RANK_BUNDLE, RANK_LEVEL_PREFAB_PATH, Prefab);
+            if (!isValid(this, true)) return;
+            const parent = this.node.getChildByPath('player_node');
+            if (!parent) throw new Error('BattleSettlement requires player_node');
+            const node = instantiate(prefab);
+            node.name = 'RankLevel';
+            this.setLayer(node, this.node.layer);
+            node.setParent(parent);
+            node.setPosition(100, 40, 0);
+            node.setScale(0.8, 0.8, 1);
+            const view = node.getComponent(RankLevelView);
+            if (!view) {
+                node.destroy();
+                throw new Error('RankLevel prefab requires RankLevelView');
+            }
+            this.rankLevelNode = node;
+            this.rankLevel = view;
+            if (this.playerProfile) view.render(this.playerProfile.netStars, this.rankAssets);
+        })();
+        this.rankLevelLoading = task;
+        const clear = (): void => { if (this.rankLevelLoading === task) this.rankLevelLoading = undefined; };
+        void task.then(clear, clear);
+        return task;
+    }
+    private setLayer(node: Node, layer: number): void {
+        node.layer = layer;
+        for (const child of node.children) this.setLayer(child, layer);
     }
     private playSpine(spine: sp.Skeleton, clip: string): void {
         if (!this.data) {
@@ -123,7 +165,11 @@ export class BattleSettlementView extends Component {
     }
     onDestroy(): void {
         this.playRequest++; this.playerRevision++;
-        this.data = undefined; this.rankLevel = undefined; this.unbindBack();
+        this.data = undefined; this.rankLevel = undefined;
+        if (this.rankLevelNode && isValid(this.rankLevelNode, true)) this.rankLevelNode.destroy();
+        this.rankLevelNode = undefined; this.rankLevelLoading = undefined;
+        this.rankAssets = undefined; this.playerProfile = undefined;
+        this.unbindBack();
     }
 
     /** The refreshed settlement prefab no longer contains the old Detail node. */

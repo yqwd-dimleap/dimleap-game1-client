@@ -16,6 +16,7 @@ import type { ModalPresenter } from '../../ui/common/ModalHost';
 import { PlayerSettingsController } from './PlayerSettingsController';
 import { MeritRewardController } from '../season/MeritRewardController';
 import { ToastService } from '../../ui/common/ToastService';
+import { RemoteContentPrewarm } from '../battle/tutorial/RemotePrewarm';
 const { ccclass } = _decorator;
 
 /** The current authored home page owns only its battle entry. BottomNav owns page navigation. */
@@ -77,6 +78,7 @@ export class HomeController extends UIBase {
             this.battleButton.interactable = true;
         }
         StartupTrace.mark('home-interactive');
+        RemoteContentPrewarm.startAfterHome(app, () => !this.disposed && !this.busy);
     }
     show(): void { this.refreshMiddleMerit(); }
     private refreshMiddleMerit(): void {

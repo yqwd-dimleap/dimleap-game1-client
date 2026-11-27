@@ -12,8 +12,7 @@ Cocos Creator 3.8.8 / TypeScript / 750×1334 / Box2D。
 | `ui_bundle` | 本地分包 | 6 | - | 大厅壳、首页、导航、PlayerInfo、ModalLayer、共享按钮和头像 |
 | `settings_ui` | 远程包 | 4 | `ui_bundle` | 玩家设置、头像设置和昵称修改 |
 | `heroes_bundle` | 远程包 | 4 | `ui_bundle` | 英雄页 Prefab、英雄肖像与卡牌底图 |
-| `battle_runtime` | 本地分包 | 5 | `ui_bundle` | 战斗场景、核心 HUD、匹配/VS、手牌、单位与教程地图、基础回合表现 |
-| `battle_presentation` | 远程包 | 3 | `ui_bundle`、`battle_runtime`、`season_content` | 回合切换、暂停和战斗结算等可延迟表现资源 |
+| `battle_runtime` | 本地分包 | 5 | `ui_bundle` | 战斗场景、核心 HUD、匹配/VS、手牌、单位、教程地图、暂停、回合结算与最终结算 |
 | `combat_shared` | 远程包 | 4 | `ui_bundle` | 公共战斗底座、兵种批量 Spine 与战斗特效 |
 | `combat_heroes` | 远程包 | 4 | `ui_bundle` | 各英雄专属 Spine 与攻击特效 |
 | `map_bundle` | 远程包 | 4 | - | 24 张常规地图 Prefab 与地图内部资源 |
@@ -27,7 +26,6 @@ Bundle 名称集中定义在 `assets/scripts/core/Bundles.ts`。公共战斗素�
 
 ```text
 assets/bundles/remote/
-├─ battle_presentation/
 ├─ combat_heroes/
 ├─ combat_shared/
 ├─ heroes_bundle/
@@ -42,7 +40,7 @@ assets/bundles/remote/
 - 启动只预载 `resources`、`main`、`ui_bundle`。新玩家在 LoadingView 阶段按需加载 `battle_runtime` 及其中的教学地图；老玩家不会加载新手引导资源。
 - 老玩家的 Loading 会挂到持久 `GlobalUI`，预加载主场景、MainShell、HomeView 和 ModalLayer，并等待 `HomeView` 首屏初始化完成后再隐藏，避免露出只有背景和底部导航的中间状态。
 - 老玩家进入匹配时才加载 `battle_runtime`；战斗场景与战斗 UI 从同一 Bundle 获取。
-- 战斗交互完成后再后台预热 `battle_presentation`；回合切换或结算资源不可用时跳过可选表现并继续流程，不阻塞对局。
+- 战斗展示资源全部随 `battle_runtime` 本地分包加载；进入战斗时一次性准备好暂停、回合结算和最终结算，不再依赖远程战斗展示包。
 - 调参和英雄攻击 GM Prefab 存放在不入 Bundle 的 `assets/prefabs/debug`，正式包不会携带这些调试资源。
 - 教学结束后只预取英雄/地图 Bundle 配置，以及公共战斗和当前阵容所需的英雄战斗资源；不再预热设置、赛季和全部地图。
 - 设置页改为远程 Bundle，在大厅中按操作加载并显示加载状态。
@@ -78,7 +76,8 @@ npm run stage:tt
 ├─ config/remote_version.json
 ├─ remote_v1.0.0/remote/<bundle>/
 ├─ remote_v1.0.1/remote/<bundle>/
-└─ remote_v1.0.4/remote/<bundle>/
+├─ remote_v1.2.0/remote/<bundle>/
+└─ remote_v1.3.0/remote/<bundle>/
 ```
 
 启动时 `RemoteVersionManager` 先拉取 `<platform-remote-base>/config/remote_version.json`，再让每个远程 Bundle 从 `remote_v<version>/remote/<bundle>/` 加载。清单按平台域名分别部署；`app.json` 的 `remoteVersion` 是首次安装、清单不可用且本地没有有效缓存时使用的主包兜底版本。
@@ -86,11 +85,11 @@ npm run stage:tt
 每次发布新远程资源：
 
 ```sh
-npm run stage:remote -- 1.0.4 --source build/wechatgame/remote
+npm run stage:remote -- 1.3.0 --source build/wechatgame/remote
 npm run verify:remote
 ```
 
-脚本会在 `release/` 生成新的 `remote_v1.0.4/remote/`、发布摘要和 `config/remote_version.json`。它拒绝覆盖已存在的版本目录。先上传整个新版本目录，再最后上传版本清单，避免玩家提前看到半成品。
+脚本会在 `release/` 生成新的 `remote_v1.3.0/remote/`、发布摘要和 `config/remote_version.json`。它拒绝覆盖已存在的版本目录。先上传整个新版本目录，再最后上传版本清单，避免玩家提前看到半成品。
 
 回滚只改版本清单，不删除或重传远程文件：
 
@@ -102,6 +101,6 @@ npm run rollback:remote -- 1.0.0
 
 版本清单支持 `bundles` 单独指定某些 Bundle 的目录，也预留了 `next` + `gray_percent` 设备稳定灰度。正常回滚直接修改 `current`，不要依赖 `rollback_to` 长期覆盖。
 
-发布脚本会保留已下线或改名的 Bundle 映射。例如 `combat_content` 拆分为 `combat_shared`、`combat_heroes` 后，清单仍会把旧客户端显式指向旧目录，避免新版本切换导致旧主包 404；确认旧版本玩家清空后再删除该兼容映射。
+发布脚本会保留已下线或改名的 Bundle 映射。例如 `combat_content` 拆分为 `combat_shared`、`combat_heroes` 后，清单仍会把旧客户端显式指向旧目录，避免新版本切换导致旧主包 404；`battle_presentation` 合并回本地 `battle_runtime` 后，新版本不再生成该目录，但清单仍让它指向 `remote_v1.2.0`，供尚未更新的旧客户端继续使用。确认旧版本玩家清空后再删除该兼容映射。
 
 `verify` 检查 Bundle 元数据与清单、优先级、依赖方向/循环、跨包静态引用、脚本层依赖、动态资源路径、启动资源边界、远程包禁用脚本、空目录/临时文件和 Prefab 内部 ID。`check-maps` 检查 25 张地图清单、路径、ID 和 Prefab 文件集合是否一致；`check-prefabs` 检查 Prefab JSON、`.meta` 和组件 `fileId` 唯一性。
